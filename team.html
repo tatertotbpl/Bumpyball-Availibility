@@ -99,6 +99,13 @@ let gridData = [];
 
 const teamRef = doc(db, 'teams', teamId);
 
+const heatmapButton = document.getElementById('viewHeatmap');
+
+heatmapButton.addEventListener('click', () => {
+  // Open the dashboard.html with the same teamId
+  window.location.href = `dashboard.html?team=${teamId}`;
+});
+
 // ---- Grid Renderer ----
 function populateGrid(data) {
   gridBody.innerHTML = '';
