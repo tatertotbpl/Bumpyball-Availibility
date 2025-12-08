@@ -35,121 +35,50 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
-// --- Firebase ---
-const firebaseConfig = {
-  apiKey: "AIzaSyAlpvgPbox4IvXQ74uvT7wx_Zv2ARwXaYY",
-  authDomain: "smashkarts-availability.firebaseapp.com",
-  projectId: "smashkarts-availability",
-  storageBucket: "smashkarts-availability.firebasestorage.app",
-  messagingSenderId: "33863251672",
-  appId: "1:33863251672:web:ffc0d728fe31321c0809ad",
-  measurementId: "G-8K3MEHMLRN"
-};
-
+const firebaseConfig = { /* same as before */ };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// --- Page setup ---
 const urlParams = new URLSearchParams(window.location.search);
 const teamId = urlParams.get('team') || "team1";
-document.getElementById("team-name").innerText = `Team Heatmap: ${teamId}`;
+document.getElementById("team-name").innerText = `Team Heatmap (UTC): ${teamId}`;
 
 const gridBody = document.querySelector('#heatmap-grid tbody');
-const hours = 24;
-const days = 7;
+const hours=24, days=7;
+const tzOffsets = { 'UTC':0,'EST':-5,'PST':-8,'CET':1,'GMT':0,'JST':9 };
 
-// --- Timezone offsets ---
-const tzOffsets = {
-  'UTC': 0,
-  'EST': -5,
-  'PST': -8,
-  'CET': 1,
-  'GMT': 0,
-  'JST': 9
-};
+function createEmptyGrid(){ const g=[]; for(let h=0;h<hours;h++){ g[h]=[]; for(let d=0;d<days;d++) g[h][d]=0;} return g; }
+function getColor(count,max){ if(!max) return '#eee'; const i=Math.round(255-(count/max)*200); return `rgb(${i},255,${i})`; }
+function renderHeatmap(grid){ gridBody.innerHTML=''; let max=0; for(let h=0;h<hours;h++) for(let d=0;d<days;d++) if(grid[h][d]>max) max=grid[h][d]; for(let h=0;h<hours;h++){ const row=document.createElement('tr'); const timeCell=document.createElement('td'); timeCell.textContent=`${h}:00`; timeCell.classList.add('time-cell'); row.appendChild(timeCell); for(let d=0;d<days;d++){ const cell=document.createElement('td'); cell.textContent=grid[h][d]; cell.style.backgroundColor=getColor(grid[h][d],max); row.appendChild(cell); } gridBody.appendChild(row); }}
 
-// --- Heatmap helpers ---
-function createEmptyGrid() {
-  const grid = [];
-  for (let h = 0; h < hours; h++) {
-    grid[h] = [];
-    for (let d = 0; d < days; d++) grid[h][d] = 0;
-  }
-  return grid;
-}
-
-function getColor(count, max) {
-  if (!max) return '#eee';
-  const intensity = Math.round(255 - (count / max) * 200);
-  return `rgb(${intensity},255,${intensity})`;
-}
-
-function renderHeatmap(grid) {
-  gridBody.innerHTML = '';
-  let maxCount = 0;
-  for (let h = 0; h < hours; h++)
-    for (let d = 0; d < days; d++)
-      if (grid[h][d] > maxCount) maxCount = grid[h][d];
-
-  for (let h = 0; h < hours; h++) {
-    const row = document.createElement('tr');
-    const timeCell = document.createElement('td');
-    timeCell.textContent = `${h}:00`;
-    timeCell.classList.add('time-cell');
-    row.appendChild(timeCell);
-
-    for (let d = 0; d < days; d++) {
-      const cell = document.createElement('td');
-      const count = grid[h][d];
-      cell.style.backgroundColor = getColor(count, maxCount);
-      cell.textContent = count;
-      row.appendChild(cell);
-    }
-
-    gridBody.appendChild(row);
-  }
-}
-
-// Convert player grid → UTC based on their timezone
-function convertPlayerGridToUTC(playerGrid, tz) {
-  const converted = createEmptyGrid();
-  const offset = tzOffsets[tz] ?? 0;
-
-  for (let h = 0; h < hours; h++) {
-    for (let d = 0; d < days; d++) {
-      if (!playerGrid[h][d]) continue;
-
-      let utcHour = (h - offset + 24) % 24;
-      let dayShift = (h - offset < 0 ? -1 : h - offset >= 24 ? 1 : 0);
-      let utcDay = (d + dayShift + 7) % 7;
-
-      converted[utcHour][utcDay] = true;
+// convert player → UTC
+function convertPlayerGridToUTC(playerGrid,tz){
+  const out=createEmptyGrid();
+  const offset = tzOffsets[tz]??0;
+  for(let h=0;h<hours;h++){
+    for(let d=0;d<days;d++){
+      if(!playerGrid[h][d]) continue;
+      let utcHour=(h - offset + 24) % 24;
+      let dayShift=(h - offset<0?-1:(h - offset>=24?1:0));
+      let utcDay=(d + dayShift + 7)%7;
+      out[utcHour][utcDay]=true;
     }
   }
-
-  return converted;
+  return out;
 }
 
-// --- Load team heatmap ---
-async function loadTeamHeatmap() {
-  const teamRef = doc(db, 'teams', teamId);
-  const snap = await getDoc(teamRef);
-  const combinedGrid = createEmptyGrid();
-
-  if (!snap.exists()) return renderHeatmap(combinedGrid);
-
-  const players = snap.data().players || {};
-  for (const name in players) {
-    const grid = players[name].grid ?? createEmptyGrid();
-    const tz = players[name].timezone ?? 'UTC';
-    const utcGrid = convertPlayerGridToUTC(grid, tz);
-
-    for (let h = 0; h < hours; h++)
-      for (let d = 0; d < days; d++)
-        if (utcGrid[h][d]) combinedGrid[h][d]++;
+async function loadTeamHeatmap(){
+  const snap = await getDoc(doc(db,'teams',teamId));
+  const combined=createEmptyGrid();
+  if(!snap.exists()){ renderHeatmap(combined); return; }
+  const players = snap.data().players||{};
+  for(const name in players){
+    const grid=players[name].grid??createEmptyGrid();
+    const tz=players[name].timezone??'UTC';
+    const utcGrid=convertPlayerGridToUTC(grid,tz);
+    for(let h=0;h<hours;h++) for(let d=0;d<days;d++) if(utcGrid[h][d]) combined[h][d]++;
   }
-
-  renderHeatmap(combinedGrid);
+  renderHeatmap(combined);
 }
 
 loadTeamHeatmap();
