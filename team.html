@@ -85,13 +85,14 @@ const db = getFirestore(app);
 
 // ---- Page setup ----
 const urlParams = new URLSearchParams(window.location.search);
-window.teamId = urlParams.get('team') || "team1"; // needed globally
+window.teamId = urlParams.get('team') || "team1";
 document.getElementById("team-name").innerText = `Availability: ${teamId}`;
 
 const gridBody = document.querySelector('#availability-grid tbody');
 const playerInput = document.getElementById('player-name');
 const loadButton = document.getElementById('loadButton');
 const saveButton = document.getElementById('saveButton');
+const timezoneSelect = document.getElementById('timezone');
 
 const startHour = 0;
 const endHour = 23;
@@ -99,17 +100,9 @@ let gridData = [];
 
 const teamRef = doc(db, 'teams', teamId);
 
-const heatmapButton = document.getElementById('viewHeatmap');
-
-heatmapButton.addEventListener('click', () => {
-  // Open the dashboard.html with the same teamId
-  window.location.href = `dashboard.html?team=${teamId}`;
-});
-
 // ---- Grid Renderer ----
 function populateGrid(data) {
   gridBody.innerHTML = '';
-
   for (let hour = startHour; hour <= endHour; hour++) {
     const row = document.createElement('tr');
     const timeCell = document.createElement('td');
@@ -133,7 +126,6 @@ function populateGrid(data) {
       gridData[hour][day] = val;
       row.appendChild(cell);
     }
-
     gridBody.appendChild(row);
   }
 }
@@ -162,9 +154,18 @@ async function loadPlayerData(name) {
   if (!name) return alert("Enter your name!");
 
   const snap = await getDoc(teamRef);
+  if (!snap.exists()) await setDoc(teamRef, { players: {} });
+
   const stored = snap.exists() ? snap.data().players?.[name] : null;
 
-  populateGrid(firestoreObjectToGrid(stored));
+  if (stored) {
+    populateGrid(firestoreObjectToGrid(stored.grid));
+    if (stored.timezone) timezoneSelect.value = stored.timezone;
+    convertGridToTimezone(stored.timezone);
+  } else {
+    populateGrid([]);
+  }
+
   await loadPlayerList();
 }
 
@@ -173,10 +174,11 @@ async function savePlayerData(name) {
   if (!name) return alert("Enter your name!");
 
   const firestoreGrid = gridToFirestoreObject(gridData);
+  const tz = timezoneSelect.value;
 
   await setDoc(
     teamRef,
-    { players: { [name]: firestoreGrid } },
+    { players: { [name]: { grid: firestoreGrid, timezone: tz } } },
     { merge: true }
   );
 
@@ -199,11 +201,25 @@ async function loadPlayerList() {
 
     li.addEventListener("click", () => {
       playerInput.value = player;
-      populateGrid(firestoreObjectToGrid(players[player]));
+      populateGrid(firestoreObjectToGrid(players[player].grid));
+      if (players[player].timezone) timezoneSelect.value = players[player].timezone;
+      convertGridToTimezone(players[player].timezone);
     });
 
     list.appendChild(li);
   });
+}
+
+// ---- Timezone Conversion ----
+function convertGridToTimezone(tz) {
+  for (let hour = 0; hour <= 23; hour++) {
+    const timeCell = gridBody.rows[hour]?.cells[0];
+    if (timeCell) {
+      const utcDate = new Date(Date.UTC(2025, 11, 8, hour, 0));
+      const tzHour = utcDate.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', timeZone: tz });
+      timeCell.textContent = `${tzHour}:00`;
+    }
+  }
 }
 
 // ---- Button Events ----
@@ -215,10 +231,14 @@ saveButton.addEventListener('click', () =>
   savePlayerData(playerInput.value.trim())
 );
 
+timezoneSelect.addEventListener('change', () => {
+  const tz = timezoneSelect.value;
+  convertGridToTimezone(tz);
+});
+
 // ---- Init ----
 populateGrid([]);
 loadPlayerList();
-
 </script>
 </body>
 </html>
