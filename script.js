@@ -1,146 +1,155 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smashkarts Team Availability</title>
-  <link rel="stylesheet" href="style.css">
-  <style>
-    table { border-collapse: collapse; width: 100%; }
-    td, th { border: 1px solid #333; padding: 5px; text-align: center; }
-    .available { background-color: #6f6; }
-    .unavailable { background-color: #f66; }
-    input { margin-bottom: 10px; }
-  </style>
-</head>
-<body>
-  <h1 id="team-name">Team Availability</h1>
+// --------------------------------------------
+// Firebase Imports
+// --------------------------------------------
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
-  <div class="player-input">
-    <label for="player-name">Player Name:</label>
-    <input type="text" id="player-name" placeholder="Your Name">
-  </div>
+// --------------------------------------------
+// Firebase Config
+// --------------------------------------------
+const firebaseConfig = {
+  apiKey: "AIzaSyAlpvgPbox4IvXQ74uvT7wx_Zv2ARwXaYY",
+  authDomain: "smashkarts-availability.firebaseapp.com",
+  projectId: "smashkarts-availability",
+  storageBucket: "smashkarts-availability.firebasestorage.app",
+  messagingSenderId: "33863251672",
+  appId: "1:33863251672:web:ffc0d728fe31321c0809ad",
+  measurementId: "G-8K3MEHMLRN"
+};
 
-  <div class="timezone-selector">
-    <label for="timezone">Select your timezone:</label>
-    <select id="timezone">
-      <option value="UTC">UTC</option>
-      <option value="America/New_York">EST</option>
-      <option value="America/Los_Angeles">PST</option>
-      <option value="Europe/London">GMT</option>
-      <option value="Europe/Berlin">CET</option>
-      <option value="Asia/Tokyo">JST</option>
-    </select>
-  </div>
+// Initialize Firebase + Firestore
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-  <table id="availability-grid">
-    <thead>
-      <tr>
-        <th>Time</th>
-        <th>Mon</th>
-        <th>Tue</th>
-        <th>Wed</th>
-        <th>Thu</th>
-        <th>Fri</th>
-        <th>Sat</th>
-        <th>Sun</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+// --------------------------------------------
+// Page Elements
+// --------------------------------------------
+const urlParams = new URLSearchParams(window.location.search);
+const teamId = urlParams.get('team') || "team1";
 
-  <button id="saveButton">Save Availability</button>
+const gridBody = document.querySelector('#availability-grid tbody');
+const timezoneSelect = document.getElementById('timezone');
+const saveButton = document.getElementById('saveButton');
+const loadButton = document.getElementById('loadButton');
+const playerInput = document.getElementById('player-name');
 
-  <script type="module">
-    // Modular Firebase SDK imports
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+document.getElementById("team-name").innerText = `Availability: ${teamId}`;
 
-    // Firebase config - replace with your project values
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
+// Grid variables
+const startHour = 0;
+const endHour = 23;
+let gridData = [];
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+// Firestore reference
+const teamRef = doc(db, 'teams', teamId);
 
-    // Get team from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const teamId = urlParams.get('team') || "team1"; // default team
-    document.getElementById("team-name").innerText = `Availability: ${teamId}`;
+// --------------------------------------------
+// Helpers: Firestore <-> Grid Converters
+// --------------------------------------------
 
-    const gridBody = document.querySelector('#availability-grid tbody');
-    const timezoneSelect = document.getElementById('timezone');
-    const saveButton = document.getElementById('saveButton');
-    const playerInput = document.getElementById('player-name');
+// Convert grid arrays into Firestore-safe objects
+function gridToFirestoreObject(grid) {
+  const out = {};
+  for (let h = 0; h < 24; h++) {
+    out[h] = {};
+    for (let d = 0; d < 7; d++) {
+      out[h][d] = !!grid[h][d];
+    }
+  }
+  return out;
+}
 
-    const startHour = 0;
-    const endHour = 23;
-    let gridData = [];
+// Convert Firestore objects back into arrays
+function firestoreObjectToGrid(obj) {
+  const grid = [];
+  for (let h = 0; h < 24; h++) {
+    grid[h] = [];
+    for (let d = 0; d < 7; d++) {
+      grid[h][d] = obj?.[h]?.[d] || false;
+    }
+  }
+  return grid;
+}
 
-    // Populate grid
-    function populateGrid(data) {
-      gridBody.innerHTML = '';
-      for (let hour = startHour; hour <= endHour; hour++) {
-        const row = document.createElement('tr');
-        const timeCell = document.createElement('td');
-        timeCell.textContent = `${hour}:00`;
-        row.appendChild(timeCell);
+// --------------------------------------------
+// Grid Rendering
+// --------------------------------------------
+function populateGrid(data) {
+  gridBody.innerHTML = '';
+  gridData = firestoreObjectToGrid(data);
 
-        gridData[hour] = gridData[hour] || [];
-        for (let day = 0; day < 7; day++) {
-          const cell = document.createElement('td');
-          const available = data?.[hour]?.[day] || false;
-          cell.classList.add(available ? 'available' : 'unavailable');
+  for (let hour = startHour; hour <= endHour; hour++) {
+    const row = document.createElement('tr');
 
-          cell.addEventListener('click', () => {
-            cell.classList.toggle('available');
-            cell.classList.toggle('unavailable');
-            gridData[hour][day] = !gridData[hour][day];
-          });
+    // Time column
+    const timeCell = document.createElement('td');
+    timeCell.textContent = `${hour}:00`;
+    row.appendChild(timeCell);
 
-          gridData[hour][day] = available;
-          row.appendChild(cell);
-        }
-        gridBody.appendChild(row);
-      }
+    // 7 days
+    for (let day = 0; day < 7; day++) {
+      const isAvailable = gridData[hour][day];
+      const cell = document.createElement('td');
+
+      cell.classList.add(isAvailable ? 'available' : 'unavailable');
+
+      // Toggle on click
+      cell.addEventListener('click', () => {
+        gridData[hour][day] = !gridData[hour][day];
+        cell.classList.toggle('available');
+        cell.classList.toggle('unavailable');
+      });
+
+      row.appendChild(cell);
     }
 
-    // Firestore document reference
-    const teamRef = doc(db, 'teams', teamId);
+    gridBody.appendChild(row);
+  }
+}
 
-    async function loadPlayerData(playerName) {
-      if (!playerName) return;
-      const snap = await getDoc(teamRef);
-      const playerGrid = snap.exists() ? snap.data().players?.[playerName] || [] : [];
-      populateGrid(playerGrid);
-    }
+// --------------------------------------------
+// Firestore Load / Save
+// --------------------------------------------
 
-    async function savePlayerData(playerName) {
-      if (!playerName) { alert('Enter your name!'); return; }
-      await setDoc(teamRef, { players: { [playerName]: gridData } }, { merge: true });
-      alert('Availability saved!');
-    }
+// Load a player's saved grid
+async function loadPlayerData(name) {
+  if (!name) return alert("Enter a name!");
 
-    // Load grid when player name changes
-    playerInput.addEventListener('change', () => loadPlayerData(playerInput.value.trim()));
+  const snap = await getDoc(teamRef);
+  const stored = snap.exists() ? snap.data().players?.[name] : null;
 
-    // Save button
-    saveButton.addEventListener('click', () => savePlayerData(playerInput.value.trim()));
+  populateGrid(stored || {});
+}
 
-    // Timezone placeholder
-    timezoneSelect.addEventListener('change', () => {
-      console.log('Selected timezone:', timezoneSelect.value);
-      // implement timezone conversion here if desired
-    });
+// Save a player's availability
+async function savePlayerData(name) {
+  if (!name) return alert("Enter a name!");
 
-    // Initialize empty grid
-    populateGrid([]);
-  </script>
-</body>
-</html>
+  const firestoreGrid = gridToFirestoreObject(gridData);
+
+  await setDoc(
+    teamRef,
+    { players: { [name]: firestoreGrid } },
+    { merge: true }
+  );
+
+  alert("Saved!");
+}
+
+// --------------------------------------------
+// Event Bindings
+// --------------------------------------------
+loadButton.addEventListener('click', () => {
+  const name = playerInput.value.trim();
+  loadPlayerData(name);
+});
+
+saveButton.addEventListener('click', () => {
+  const name = playerInput.value.trim();
+  savePlayerData(name);
+});
+
+// --------------------------------------------
+// Initialize with empty grid
+// --------------------------------------------
+populateGrid({});
