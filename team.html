@@ -52,11 +52,11 @@
 
   <button id="saveButton">Save Availability</button>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
-    // Firebase config - replace with your actual keys
+// ---- Firebase ----
 const firebaseConfig = {
   apiKey: "AIzaSyAlpvgPbox4IvXQ74uvT7wx_Zv2ARwXaYY",
   authDomain: "smashkarts-availability.firebaseapp.com",
@@ -67,79 +67,121 @@ const firebaseConfig = {
   measurementId: "G-8K3MEHMLRN"
 };
 
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+// ---- Page setup ----
+const urlParams = new URLSearchParams(window.location.search);
+const teamId = urlParams.get('team') || "team1";
+document.getElementById("team-name").innerText = `Availability: ${teamId}`;
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const teamId = urlParams.get('team') || "team1";
-    document.getElementById("team-name").innerText = `Availability: ${teamId}`;
+const gridBody = document.querySelector('#availability-grid tbody');
+const timezoneSelect = document.getElementById('timezone');
+const saveButton = document.getElementById('saveButton');
+const playerInput = document.getElementById('player-name');
+const loadButton = document.getElementById('loadButton');
 
-    const gridBody = document.querySelector('#availability-grid tbody');
-    const timezoneSelect = document.getElementById('timezone');
-    const saveButton = document.getElementById('saveButton');
-    const playerInput = document.getElementById('player-name');
-    const loadButton = document.getElementById('loadButton');
+const startHour = 0;
+const endHour = 23;
+let gridData = [];
 
-    const startHour = 0;
-    const endHour = 23;
-    let gridData = [];
+// ---- Grid Renderer ----
+function populateGrid(data) {
+  gridBody.innerHTML = '';
 
-    function populateGrid(data) {
-      gridBody.innerHTML = '';
-      for (let hour = startHour; hour <= endHour; hour++) {
-        const row = document.createElement('tr');
-        const timeCell = document.createElement('td');
-        timeCell.textContent = `${hour}:00`;
-        row.appendChild(timeCell);
+  for (let hour = startHour; hour <= endHour; hour++) {
+    const row = document.createElement('tr');
+    const timeCell = document.createElement('td');
+    timeCell.textContent = `${hour}:00`;
+    row.appendChild(timeCell);
 
-        gridData[hour] = gridData[hour] || [];
-        for (let day = 0; day < 7; day++) {
-          const cell = document.createElement('td');
-          const available = data?.[hour]?.[day] || false;
-          cell.classList.add(available ? 'available' : 'unavailable');
+    gridData[hour] = gridData[hour] || [];
 
-          cell.addEventListener('click', () => {
-            cell.classList.toggle('available');
-            cell.classList.toggle('unavailable');
-            gridData[hour][day] = !gridData[hour][day];
-          });
+    for (let day = 0; day < 7; day++) {
+      const val = data?.[hour]?.[day] || false;
 
-          gridData[hour][day] = available;
-          row.appendChild(cell);
-        }
-        gridBody.appendChild(row);
-      }
+      const cell = document.createElement('td');
+      cell.classList.add(val ? 'available' : 'unavailable');
+
+      cell.addEventListener('click', () => {
+        const now = !gridData[hour][day];
+        gridData[hour][day] = now;
+        cell.classList.toggle('available');
+        cell.classList.toggle('unavailable');
+      });
+
+      gridData[hour][day] = val;
+      row.appendChild(cell);
     }
 
-    const teamRef = doc(db, 'teams', teamId);
+    gridBody.appendChild(row);
+  }
+}
 
-    async function loadPlayerData(playerName) {
-      if (!playerName) { alert('Enter your name!'); return; }
-      const snap = await getDoc(teamRef);
-      const playerGrid = snap.exists() ? snap.data().players?.[playerName] || [] : [];
-      populateGrid(playerGrid);
+// ---- Firestore ----
+const teamRef = doc(db, 'teams', teamId);
+
+// Convert grid arrays → Firestore-safe objects
+function gridToFirestoreObject(grid) {
+  const out = {};
+  for (let h = 0; h < grid.length; h++) {
+    out[h] = {};
+    for (let d = 0; d < 7; d++) {
+      out[h][d] = !!grid[h][d];
     }
+  }
+  return out;
+}
 
-    async function savePlayerData(playerName) {
-      if (!playerName) { alert('Enter your name!'); return; }
-      await setDoc(teamRef, { players: { [playerName]: gridData } }, { merge: true });
-      alert('Availability saved!');
+// Convert Firestore objects → arrays
+function firestoreObjectToGrid(obj) {
+  const grid = [];
+  for (let h = 0; h < 24; h++) {
+    grid[h] = [];
+    for (let d = 0; d < 7; d++) {
+      grid[h][d] = obj?.[h]?.[d] || false;
     }
+  }
+  return grid;
+}
 
-    // Load grid when clicking Load Grid
-    loadButton.addEventListener('click', () => loadPlayerData(playerInput.value.trim()));
+// ---- Load player data ----
+async function loadPlayerData(name) {
+  if (!name) return alert("Enter your name!");
+  
+  const snap = await getDoc(teamRef);
+  const stored = snap.exists() ? snap.data().players?.[name] : null;
 
-    // Save grid
-    saveButton.addEventListener('click', () => savePlayerData(playerInput.value.trim()));
+  const grid = firestoreObjectToGrid(stored);
+  populateGrid(grid);
+}
 
-    timezoneSelect.addEventListener('change', () => {
-      console.log('Selected timezone:', timezoneSelect.value);
-      // optional: implement timezone conversion
-    });
+// ---- Save player data ----
+async function savePlayerData(name) {
+  if (!name) return alert("Enter your name!");
 
-    // Initialize empty grid
-    populateGrid([]);
-  </script>
+  const firestoreGrid = gridToFirestoreObject(gridData);
+
+  await setDoc(
+    teamRef, 
+    { players: { [name]: firestoreGrid } },
+    { merge: true }
+  );
+
+  alert("Availability saved!");
+}
+
+// ---- Button events ----
+loadButton.addEventListener('click', () =>
+  loadPlayerData(playerInput.value.trim())
+);
+
+saveButton.addEventListener('click', () =>
+  savePlayerData(playerInput.value.trim())
+);
+
+// ---- Init blank grid ----
+populateGrid([]);
+</script>
 </body>
 </html>
