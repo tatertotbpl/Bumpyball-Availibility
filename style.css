@@ -22,11 +22,38 @@ h1 {
 }
 
 #availability-grid td.available {
-    background-color: #8fbc8f;
+    background-color: #8fbc8f; /* green */
 }
 
 #availability-grid td.unavailable {
-    background-color: #f08080;
+    background-color: #f08080; /* red */
+}
+
+#availability-grid td.maybe {
+    background-color: #fcad5f; /* orange/yellow */
+}
+
+/* Legend styling */
+#legend {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    font-weight: bold;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.legend-color {
+    width: 20px;
+    height: 20px;
+    border: 1px solid #333;
+}
+
 }
 
 .timezone-selector {
