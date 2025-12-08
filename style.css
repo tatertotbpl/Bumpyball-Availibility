@@ -1,0 +1,34 @@
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    padding: 20px;
+    background-color: #f0f0f0;
+}
+
+h1 {
+    color: #333;
+}
+
+#availability-grid {
+    border-collapse: collapse;
+    margin: 20px auto;
+}
+
+#availability-grid th, #availability-grid td {
+    border: 1px solid #999;
+    padding: 10px;
+    min-width: 50px;
+    cursor: pointer;
+}
+
+#availability-grid td.available {
+    background-color: #8fbc8f;
+}
+
+#availability-grid td.unavailable {
+    background-color: #f08080;
+}
+
+.timezone-selector {
+    margin-bottom: 20px;
+}
