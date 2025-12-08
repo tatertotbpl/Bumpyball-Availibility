@@ -94,9 +94,10 @@ const saveButton = document.getElementById('saveButton');
 const timezoneSelect = document.getElementById('timezone');
 
 const hours = 24, days = 7;
-let gridData = [];
+let gridDataUTC = []; // store grid always in UTC
+let currentPlayerName = null;
 
-// --- timezone offsets in hours ---
+// timezone offsets in hours
 const tzOffsets = { 'UTC':0,'EST':-5,'PST':-8,'CET':1,'GMT':0,'JST':9 };
 
 // --- helpers ---
@@ -140,26 +141,37 @@ function convertGridToUTC(grid, tz){
   return out;
 }
 
-// populate table
+// populate table in local tz
 function populateGrid(data){
   gridBody.innerHTML='';
   for(let h=0;h<hours;h++){
     const row = document.createElement('tr');
-    const timeCell = document.createElement('td'); timeCell.textContent=`${h}:00`; row.appendChild(timeCell);
-    gridData[h] = gridData[h] || [];
+    const timeCell = document.createElement('td'); 
+    timeCell.textContent=`${h}:00`; 
+    row.appendChild(timeCell);
+
     for(let d=0;d<days;d++){
       const val = data?.[h]?.[d] || false;
       const cell = document.createElement('td');
       cell.classList.add(val?'available':'unavailable');
       cell.addEventListener('click',()=>{
-        gridData[h][d] = !gridData[h][d];
-        cell.classList.toggle('available'); cell.classList.toggle('unavailable');
+        const tz = timezoneSelect.value;
+        const displayGrid = convertGridFromUTC(gridDataUTC, tz);
+        displayGrid[h][d] = !displayGrid[h][d];
+        gridDataUTC = convertGridToUTC(displayGrid, tz);
+        updateGridDisplay();
       });
-      gridData[h][d] = val;
       row.appendChild(cell);
     }
     gridBody.appendChild(row);
   }
+}
+
+// refresh table display in current timezone without touching UTC data
+function updateGridDisplay() {
+  const tz = timezoneSelect.value;
+  const displayGrid = convertGridFromUTC(gridDataUTC, tz);
+  populateGrid(displayGrid);
 }
 
 // Firestore helpers
@@ -169,14 +181,19 @@ function firestoreToGrid(obj){ return obj; }
 // load player
 async function loadPlayerData(name){
   if(!name) return alert("Enter your name!");
+  currentPlayerName = name;
   const snap = await getDoc(doc(db,'teams',teamId));
   if(!snap.exists()) await setDoc(doc(db,'teams',teamId),{players:{}});
   const stored = snap.exists()? snap.data().players?.[name]: null;
   if(stored){
     const tz = stored.timezone || 'UTC';
     timezoneSelect.value = tz;
-    populateGrid(convertGridFromUTC(stored.grid, tz));
-  } else populateGrid(createEmptyGrid());
+    gridDataUTC = stored.grid;
+    updateGridDisplay();
+  } else {
+    gridDataUTC = createEmptyGrid();
+    updateGridDisplay();
+  }
   await loadPlayerList();
 }
 
@@ -184,9 +201,8 @@ async function loadPlayerData(name){
 async function savePlayerData(name){
   if(!name) return alert("Enter your name!");
   const tz = timezoneSelect.value;
-  const utcGrid = convertGridToUTC(gridData, tz);
   await setDoc(doc(db,'teams',teamId),{
-    players: {[name]: {grid:utcGrid, timezone:tz}}
+    players: {[name]: {grid:gridDataUTC, timezone:tz}}
   }, {merge:true});
   alert("Saved!");
   await loadPlayerList();
@@ -204,9 +220,11 @@ async function loadPlayerList(){
     li.textContent = player;
     li.addEventListener('click',()=>{
       playerInput.value = player;
+      currentPlayerName = player;
       const tz = players[player].timezone || 'UTC';
       timezoneSelect.value = tz;
-      populateGrid(convertGridFromUTC(players[player].grid, tz));
+      gridDataUTC = players[player].grid;
+      updateGridDisplay();
     });
     list.appendChild(li);
   });
@@ -215,9 +233,11 @@ async function loadPlayerList(){
 // events
 loadButton.addEventListener('click',()=>loadPlayerData(playerInput.value.trim()));
 saveButton.addEventListener('click',()=>savePlayerData(playerInput.value.trim()));
+timezoneSelect.addEventListener('change', ()=>updateGridDisplay());
 
 // init
-populateGrid(createEmptyGrid());
+gridDataUTC = createEmptyGrid();
+updateGridDisplay();
 loadPlayerList();
 </script>
 </body>
