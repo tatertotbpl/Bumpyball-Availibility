@@ -1,81 +1,149 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Team Availability</title>
 <link rel="stylesheet" href="style.css">
 <style>
-  table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-  td, th { border: 1px solid #333; padding: 5px; text-align: center; cursor: pointer; }
-  #legend { margin: 10px auto; }
-  .legend-item { display: inline-block; margin: 0 10px; padding: 5px 10px; border: 1px solid #999; border-radius: 4px; }
-  .no { background-color: #f08080; }      /* red = no */
-  .maybe { background-color: #ffd580; }   /* orange = maybe */
-  .yes { background-color: #8fbc8f; }     /* green = yes */
-  #player-list button { width: 100%; cursor: pointer; margin: 2px 0; }
+  :root{--sidebar-w:180px}
+  body{margin:0;padding:20px;font-family:Arial,helvetica,sans-serif;background:#f3f4f6}
+  main{max-width:1100px;margin:0 auto;padding-right:calc(var(--sidebar-w) + 20px)}
+  h1{margin:0 0 10px 0;color:#222}
+  /* legend + grid */
+  #legend{margin:10px 0}
+  .legend-item{display:inline-block;margin:0 8px;padding:6px 10px;border-radius:6px;border:1px solid #bbb;font-weight:600}
+  .no{background:#f08080;color:#000}
+  .maybe{background:#ffd580;color:#000}
+  .yes{background:#8fbc8f;color:#000}
+  /* grid */
+  table{border-collapse:collapse;width:100%;background:#fff;box-shadow:0 1px 0 rgba(0,0,0,.06)}
+  th,td{border:1px solid #ddd;padding:6px;text-align:center;min-width:48px;cursor:pointer}
+  td.no{background:#f08080}
+  td.maybe{background:#ffd580}
+  td.yes{background:#8fbc8f}
+  /* small UI */
+  .controls{display:flex;gap:8px;align-items:center;margin:10px 0}
+  .player-input input{padding:6px}
+  .player-input button{padding:6px 8px}
+  #player-list{margin-top:12px}
+  #players-ul{list-style:none;padding:0;margin:6px 0}
+  #players-ul li{margin:4px 0}
+  #players-ul button{width:100%;padding:8px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;text-align:left}
+  #players-ul button:hover{background:#f0f0f0}
+  /* sidebar */
+  #sidebar{position:fixed;right:0;top:0;width:var(--sidebar-w);height:100vh;background:#101217;color:#fff;padding:12px;box-shadow:-4px 0 12px rgba(0,0,0,.15);overflow:auto}
+  #sidebar h3{margin:6px 0 10px 0;font-size:16px}
+  #sidebar button{display:block;width:100%;padding:8px;margin:6px 0;border:none;border-radius:6px;background:#1a1d23;color:#fff;cursor:pointer}
+  #sidebar button:hover{background:#23272f}
+  .hidden-test{opacity:.35}
+  /* login box */
+  #login-box{margin:8px 0;padding:8px;border-radius:8px;background:#fff;border:1px solid #ddd}
+  #login-box input{display:block;width:100%;padding:8px;margin:6px 0;border:1px solid #ccc;border-radius:6px}
+  #login-box button{padding:8px 10px;margin-right:6px}
+  #login-status{font-size:13px;color:#444;margin-top:6px}
+  /* responsive */
+  @media (max-width:900px){ main{padding-right:12px} #sidebar{display:none}}
 </style>
 </head>
 <body>
-<h1 id="team-name">Team Availability</h1>
-
-<!-- Legend -->
-<div id="legend">
-  <span class="legend-item no">No</span>
-  <span class="legend-item maybe">Maybe</span>
-  <span class="legend-item yes">Yes</span>
+<div id="sidebar" aria-hidden="false">
+  <h3>Teams</h3>
+  <button onclick="goTeam('Canada')">🇨🇦 Canada</button>
+  <button onclick="goTeam('USA_Red')">🇺🇸 USA Red</button>
+  <button onclick="goTeam('USA_White')">🇺🇸 USA White</button>
+  <button onclick="goTeam('SUD')">🏳️ SUD</button>
+  <button onclick="goTeam('Europe')">🌍 Europe</button>
+  <button onclick="goTeam('Africa')">🌍 Africa</button>
+  <button onclick="goTeam('Asia')">🌏 Asia</button>
+  <button onclick="goTeam('Geru')">🌐 Geru</button>
+  <button onclick="goTeam('UK')">🇬🇧 UK</button>
+  <button class="hidden-test" onclick="goTeam('team1')">🔧 team1 (test)</button>
 </div>
 
-<button onclick="window.location.href='dashboard.html?team=' + teamId">
-  Open Team Dashboard
-</button>
+<main>
+  <h1 id="team-name">Team Availability</h1>
 
-<div class="player-input">
-  <label for="player-name">Player Name:</label>
-  <input type="text" id="player-name" placeholder="Your Name">
-  <button id="loadButton">Load Grid</button>
-</div>
+  <!-- legend -->
+  <div id="legend">
+    <span class="legend-item no">🔴</span>
+    <span class="legend-item maybe">🟠</span>
+    <span class="legend-item yes">🟢</span>
+  </div>
 
-<div id="player-list">
-  <h3>Players</h3>
-  <ul id="players-ul"></ul>
-</div>
+  <!-- dashboard button -->
+  <div style="margin:8px 0">
+    <button id="openDashboard">📊 Open Team Dashboard</button>
+  </div>
 
-<div class="timezone-selector">
-  <label for="timezone">Select your timezone:</label>
-  <select id="timezone">
-    <option value="UTC">UTC</option>
-    <option value="EST">EST</option>
-    <option value="PST">PST</option>
-    <option value="CET">CET</option>
-    <option value="GMT">GMT</option>
-    <option value="JST">JST</option>
-  </select>
-</div>
+  <!-- login box -->
+  <div id="login-box" aria-live="polite">
+    <strong style="display:block;margin-bottom:6px">🔐 Sign in</strong>
+    <input id="login-user" placeholder="username (no spaces)" />
+    <input id="login-pass" type="password" placeholder="password" />
+    <div style="margin-top:6px">
+      <button id="register-btn">➕ Register</button>
+      <button id="login-btn">🔑 Login</button>
+      <button id="logout-btn" style="display:none">⎋ Logout</button>
+    </div>
+    <div id="login-status"></div>
+  </div>
 
-<table id="availability-grid">
-  <thead>
-    <tr>
-      <th>Time</th>
-      <th>Mon</th>
-      <th>Tue</th>
-      <th>Wed</th>
-      <th>Thu</th>
-      <th>Fri</th>
-      <th>Sat</th>
-      <th>Sun</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
+  <!-- controls -->
+  <div class="controls">
+    <div class="player-input">
+      <label style="font-weight:600;margin-right:6px">👤</label>
+      <input id="player-name" placeholder="Your name" />
+      <button id="loadButton">📥</button>
+    </div>
 
-<button id="saveButton">Save Availability</button>
+    <div style="margin-left:12px">
+      <label style="font-weight:600">⏰</label>
+      <select id="timezone">
+        <option value="UTC">UTC</option>
+        <option value="EST">EST</option>
+        <option value="PST">PST</option>
+        <option value="CET">CET</option>
+        <option value="GMT">GMT</option>
+        <option value="JST">JST</option>
+      </select>
+    </div>
+
+    <div style="margin-left:auto">
+      <button id="saveButton">💾 Save</button>
+    </div>
+  </div>
+
+  <!-- players list -->
+  <div id="player-list">
+    <h3 style="margin:6px 0 4px 0">Players</h3>
+    <ul id="players-ul"></ul>
+  </div>
+
+  <!-- availability grid -->
+  <table id="availability-grid" aria-label="availability grid">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</main>
 
 <script type="module">
+/* ======= FIREBASE + AUTH SETUP ======= */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 
-// --- Firebase ---
 const firebaseConfig = {
   apiKey: "AIzaSyAlpvgPbox4IvXQ74uvT7wx_Zv2ARwXaYY",
   authDomain: "smashkarts-availability.firebaseapp.com",
@@ -88,151 +156,202 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-// --- Page setup ---
+/* ======= PAGE SETUP & WHITELIST ======= */
+const allowedTeams = ["Canada","USA_Red","USA_White","SUD","Europe","Africa","Asia","Geru","UK","team1"];
 const urlParams = new URLSearchParams(window.location.search);
 const teamId = urlParams.get('team') || "team1";
+if (!allowedTeams.includes(teamId)) {
+  document.body.innerHTML = `<main style="max-width:700px;margin:60px auto;font-family:Arial,sans-serif"><h1>Team does not exist.</h1><p>This team id is not allowed.</p></main>`;
+  throw new Error("Not allowed team");
+}
 window.teamId = teamId;
-document.getElementById("team-name").innerText = `Availability: ${teamId}`;
+document.getElementById('team-name').innerText = `Availability: ${teamId}`;
 
+/* ======= DOM refs ======= */
 const gridBody = document.querySelector('#availability-grid tbody');
 const playerInput = document.getElementById('player-name');
 const loadButton = document.getElementById('loadButton');
 const saveButton = document.getElementById('saveButton');
 const timezoneSelect = document.getElementById('timezone');
+const playersUL = document.getElementById('players-ul');
+const openDashboardBtn = document.getElementById('openDashboard');
 
+const loginUser = document.getElementById('login-user');
+const loginPass = document.getElementById('login-pass'); // may be undefined if user didn't include id; handle later
+const registerBtn = document.getElementById('register-btn');
+const loginBtn = document.getElementById('login-btn');
+const logoutBtn = document.getElementById('logout-btn');
+const loginStatus = document.getElementById('login-status');
+
+openDashboardBtn.onclick = ()=> window.location.href = `dashboard.html?team=${teamId}`;
+
+/* ======= GRID MODEL ======= */
 const hours = 24;
 const days = 7;
-let gridData = [];
-
-// --- Grid helpers ---
-function createEmptyGrid() {
-  const grid = [];
-  for (let h = 0; h < hours; h++) {
-    grid[h] = [];
-    for (let d = 0; d < days; d++) grid[h][d] = 0; // 0 = No
-  }
-  return grid;
+let gridData = []; // numeric grid for currently displayed (0/1/2)
+function createEmptyGrid(){
+  const g = [];
+  for(let h=0;h<hours;h++){ g[h]=[]; for(let d=0;d<days;d++) g[h][d]=0; }
+  return g;
 }
 
-function getClassForValue(val) {
-  if (val === 0) return 'no';
-  if (val === 1) return 'maybe';
-  if (val === 2) return 'yes';
-}
+/* ======= TIMEZONE OFFSETS (simple fixed offsets) ======= */
+const tzOffsets = { 'UTC':0,'EST':-5,'PST':-8,'CET':1,'GMT':0,'JST':9 };
 
-// Populate grid
-function populateGrid(data) {
+/* ======= UI HELPERS ======= */
+function getClassForValue(v){ return v===0?'no':v===1?'maybe':'yes'; }
+
+function populateGrid(data){
   gridBody.innerHTML = '';
-  for (let h = 0; h < hours; h++) {
+  for (let h=0; h<hours; h++){
     const row = document.createElement('tr');
-    const timeCell = document.createElement('td');
-    timeCell.textContent = `${h}:00`;
-    row.appendChild(timeCell);
-
+    const tcell = document.createElement('td'); tcell.textContent = `${h}:00`; tcell.style.fontWeight='600';
+    row.appendChild(tcell);
     gridData[h] = gridData[h] || [];
-
-    for (let d = 0; d < days; d++) {
+    for (let d=0; d<days; d++){
       const val = data?.[h]?.[d] ?? 0;
       const cell = document.createElement('td');
+      gridData[h][d] = val;
       cell.className = getClassForValue(val);
-
-      // Cycle on click: 0 → 1 → 2 → 0
-      cell.addEventListener('click', () => {
+      // click cycles 0->1->2->0 and saves in gridData
+      cell.addEventListener('click', ()=>{
         gridData[h][d] = (gridData[h][d] + 1) % 3;
         cell.className = getClassForValue(gridData[h][d]);
       });
-
-      gridData[h][d] = val;
       row.appendChild(cell);
     }
-
     gridBody.appendChild(row);
   }
 }
 
-// --- Firestore helpers ---
-function gridToFirestore(grid) {
+/* ======= FIRESTORE CONVERSION (store as objects to avoid nested arrays issues) ======= */
+function gridToFirestoreObject(grid){
   const out = {};
-  for (let h = 0; h < hours; h++) {
-    out[h] = {};
-    for (let d = 0; d < days; d++) out[h][d] = grid[h][d];
-  }
+  for(let h=0;h<hours;h++){ out[h] = {}; for(let d=0;d<days;d++) out[h][d] = grid[h][d] ?? 0; }
   return out;
 }
-
-function firestoreToGrid(obj) {
-  const grid = [];
-  for (let h = 0; h < hours; h++) {
-    grid[h] = [];
-    for (let d = 0; d < days; d++) grid[h][d] = obj?.[h]?.[d] ?? 0;
-  }
-  return grid;
+function firestoreObjectToGrid(obj){
+  const g = createEmptyGrid();
+  for(let h=0;h<hours;h++) for(let d=0;d<days;d++) g[h][d] = obj?.[h]?.[d] ?? 0;
+  return g;
 }
 
-// --- Load Player Data ---
-async function loadPlayerData(name) {
-  if (!name) return alert("Enter your name!");
+/* ======= FIRESTORE DOC REF ======= */
+const teamRef = (id)=> doc(db, 'teams', id);
 
-  const snap = await getDoc(doc(db, 'teams', teamId));
-  if (!snap.exists()) await setDoc(doc(db, 'teams', teamId), { players: {} });
-
-  const stored = snap.exists() ? snap.data().players?.[name] : null;
-
-  if (stored) {
-    populateGrid(firestoreToGrid(stored.grid));
-    if (stored.timezone) timezoneSelect.value = stored.timezone;
-  } else {
-    populateGrid(createEmptyGrid()); // start all cells as No
-  }
-
+/* ======= LOAD / SAVE PLAYER ======= */
+async function loadPlayerData(name){
+  if(!name) return alert('enter a name');
+  const snap = await getDoc(teamRef(teamId));
+  if(!snap.exists()) await setDoc(teamRef(teamId), { players: {} });
+  const players = snap.exists() ? snap.data().players || {} : {};
+  const stored = players[name] || null;
+  if(stored){
+    populateGrid(firestoreObjectToGrid(stored.grid));
+    if(stored.timezone) timezoneSelect.value = stored.timezone;
+  } else populateGrid(createEmptyGrid());
   await loadPlayerList();
 }
 
-// --- Save Player Data ---
-async function savePlayerData(name) {
-  if (!name) return alert("Enter your name!");
-  const tz = timezoneSelect.value;
-  const firestoreGrid = gridToFirestore(gridData);
+async function savePlayerData(name){
+  if(!name) return alert('enter a name');
+  // require login
+  const user = auth.currentUser;
+  if(!user){ return alert('you must be logged in to save (register/login above)'); }
+  // ensure username matches logged in user
+  const short = user.email.replace(/@.*$/,'');
+  if(short !== name){
+    return alert(`save blocked: logged in as "${short}". Set player name to that, or log in as that user.`);
+  }
 
-  await setDoc(doc(db, 'teams', teamId), {
-    players: { [name]: { grid: firestoreGrid, timezone: tz } }
-  }, { merge: true });
-
-  alert("Saved!");
+  // convert gridData -> firestore object
+  const firestoreGrid = gridToFirestoreObject(gridData);
+  const tz = timezoneSelect.value || 'UTC';
+  await setDoc(teamRef(teamId), { players: { [name]: { grid: firestoreGrid, timezone: tz } } }, { merge:true });
+  alert('Saved!');
   await loadPlayerList();
 }
 
-// --- Player List ---
-async function loadPlayerList() {
-  const snap = await getDoc(doc(db, 'teams', teamId));
-  if (!snap.exists()) return;
+/* ======= PLAYER LIST ======= */
+async function loadPlayerList(){
+  const snap = await getDoc(teamRef(teamId));
+  if(!snap.exists()) return;
   const players = snap.data().players || {};
-  const list = document.getElementById("players-ul");
-  list.innerHTML = "";
-
-  Object.keys(players).forEach(player => {
-    const li = document.createElement("li");
-    const btn = document.createElement("button");
-    btn.textContent = player;
-    btn.addEventListener("click", () => {
-      playerInput.value = player;
-      populateGrid(firestoreToGrid(players[player].grid));
-      if (players[player].timezone) timezoneSelect.value = players[player].timezone;
+  playersUL.innerHTML = '';
+  Object.keys(players).forEach(p=>{
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.textContent = p;
+    btn.addEventListener('click', ()=>{
+      playerInput.value = p;
+      populateGrid(firestoreObjectToGrid(players[p].grid));
+      if(players[p].timezone) timezoneSelect.value = players[p].timezone;
     });
     li.appendChild(btn);
-    list.appendChild(li);
+    playersUL.appendChild(li);
   });
 }
 
-// --- Button events ---
-loadButton.addEventListener('click', () => loadPlayerData(playerInput.value.trim()));
-saveButton.addEventListener('click', () => savePlayerData(playerInput.value.trim()));
+/* ======= AUTH UI ======= */
+registerBtn.addEventListener('click', async ()=>{
+  const u = document.getElementById('login-user').value?.trim();
+  const p = document.getElementById('login-pass').value ?? document.getElementById('login-pass')?.value;
+  if(!u || !p) return alert('fill username and password');
+  // create email like username@bumpy.local (no sending needed)
+  try{
+    await createUserWithEmailAndPassword(auth, `${u}@bumpyball.local`, p);
+    loginStatus.textContent = 'Registered and signed in';
+  }catch(e){ alert(e.message) }
+});
 
-// --- Init ---
+loginBtn.addEventListener('click', async ()=>{
+  const u = document.getElementById('login-user').value?.trim();
+  const p = document.getElementById('login-pass').value ?? document.getElementById('login-pass')?.value;
+  if(!u || !p) return alert('fill username and password');
+  try{
+    await signInWithEmailAndPassword(auth, `${u}@bumpyball.local`, p);
+    loginStatus.textContent = 'Signed in';
+  }catch(e){ alert(e.message) }
+});
+
+logoutBtn.addEventListener('click', async ()=> { await signOut(auth); });
+
+onAuthStateChanged(auth, user=>{
+  if(user){
+    const short = user.email.replace(/@.*$/,'');
+    loginStatus.textContent = `Signed in as ${short}`;
+    logoutBtn.style.display = 'inline-block';
+    loginBtn.style.display = 'none';
+    registerBtn.style.display = 'none';
+    document.getElementById('login-user').value = short;
+    playerInput.value = short;
+    playerInput.disabled = true;
+  } else {
+    loginStatus.textContent = 'Not signed in';
+    logoutBtn.style.display = 'none';
+    loginBtn.style.display = 'inline-block';
+    registerBtn.style.display = 'inline-block';
+    playerInput.disabled = false;
+  }
+});
+
+/* ======= BUTTON HOOKUPS ======= */
+loadButton.addEventListener('click', ()=> loadPlayerData(playerInput.value.trim()));
+saveButton.addEventListener('click', ()=> savePlayerData(playerInput.value.trim()));
+
+/* ======= NAVIGATION / SIDEBAR HELPERS ======= */
+function goTeam(id){
+  if(!allowedTeams.includes(id)){ alert('Team does not exist'); return; }
+  window.location.href = `team.html?team=${id}`;
+}
+window.goTeam = goTeam; // allow inline onclick from HTML
+
+/* ======= INIT ======= */
 populateGrid(createEmptyGrid());
 loadPlayerList();
+
 </script>
 </body>
 </html>
-
