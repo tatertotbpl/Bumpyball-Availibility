@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smashkarts Availability</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Smashkarts Team Availability</h1>
+
+    <div class="timezone-selector">
+        <label for="timezone">Select your timezone:</label>
+        <select id="timezone">
+            <option value="UTC">UTC</option>
+            <option value="America/New_York">EST</option>
+            <option value="America/Los_Angeles">PST</option>
+            <option value="Europe/London">GMT</option>
+            <option value="Europe/Berlin">CET</option>
+            <option value="Asia/Tokyo">JST</option>
+        </select>
+    </div>
+
+    <table id="availability-grid">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Mon</th>
+                <th>Tue</th>
+                <th>Wed</th>
+                <th>Thu</th>
+                <th>Fri</th>
+                <th>Sat</th>
+                <th>Sun</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- JS will populate rows -->
+        </tbody>
+    </table>
+
+    <script src="script.js"></script>
+</body>
+</html>
