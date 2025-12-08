@@ -57,14 +57,16 @@
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
     // Firebase config - replace with your actual keys
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
+const firebaseConfig = {
+  apiKey: "AIzaSyAlpvgPbox4IvXQ74uvT7wx_Zv2ARwXaYY",
+  authDomain: "smashkarts-availability.firebaseapp.com",
+  projectId: "smashkarts-availability",
+  storageBucket: "smashkarts-availability.firebasestorage.app",
+  messagingSenderId: "33863251672",
+  appId: "1:33863251672:web:ffc0d728fe31321c0809ad",
+  measurementId: "G-8K3MEHMLRN"
+};
+
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
