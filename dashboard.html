@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Heatmap</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+  td, th { border: 1px solid #333; padding: 5px; text-align: center; }
+  td { transition: background-color 0.2s; }
+  .time-cell { font-weight: bold; background-color: #eee; }
+</style>
+</head>
+<body>
+<h1 id="team-name">Team Heatmap</h1>
+
+<table id="heatmap-grid">
+  <thead>
+    <tr>
+      <th>Time</th>
+      <th>Mon</th>
+      <th>Tue</th>
+      <th>Wed</th>
+      <th>Thu</th>
+      <th>Fri</th>
+      <th>Sat</th>
+      <th>Sun</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
+// --- Firebase config ---
+const firebaseConfig = {
+  apiKey: "AIzaSyAlpvgPbox4IvXQ74uvT7wx_Zv2ARwXaYY",
+  authDomain: "smashkarts-availability.firebaseapp.com",
+  projectId: "smashkarts-availability",
+  storageBucket: "smashkarts-availability.firebasestorage.app",
+  messagingSenderId: "33863251672",
+  appId: "1:33863251672:web:ffc0d728fe31321c0809ad",
+  measurementId: "G-8K3MEHMLRN"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// --- Page setup ---
+const urlParams = new URLSearchParams(window.location.search);
+const teamId = urlParams.get('team') || "team1";
+document.getElementById("team-name").innerText = `Team Heatmap: ${teamId}`;
+
+const gridBody = document.querySelector('#heatmap-grid tbody');
+const hours = 24;
+const days = 7;
+
+// --- Heatmap functions ---
+function createEmptyGrid() {
+  const grid = [];
+  for (let h = 0; h < hours; h++) {
+    grid[h] = [];
+    for (let d = 0; d < days; d++) grid[h][d] = 0;
+  }
+  return grid;
+}
+
+// Map number of available players → color intensity
+function getColor(count, max) {
+  if (!max) return '#eee';
+  const intensity = Math.round(255 - (count / max) * 200); // higher count = darker green
+  return `rgb(${intensity},255,${intensity})`;
+}
+
+function renderHeatmap(grid) {
+  gridBody.innerHTML = '';
+  let maxCount = 0;
+  for (let h = 0; h < hours; h++)
+    for (let d = 0; d < days; d++)
+      if (grid[h][d] > maxCount) maxCount = grid[h][d];
+
+  for (let h = 0; h < hours; h++) {
+    const row = document.createElement('tr');
+    const timeCell = document.createElement('td');
+    timeCell.textContent = `${h}:00`;
+    timeCell.classList.add('time-cell');
+    row.appendChild(timeCell);
+
+    for (let d = 0; d < days; d++) {
+      const cell = document.createElement('td');
+      const count = grid[h][d];
+      cell.style.backgroundColor = getColor(count, maxCount);
+      cell.textContent = count; // shows number of available players
+      row.appendChild(cell);
+    }
+
+    gridBody.appendChild(row);
+  }
+}
+
+// --- Load data ---
+async function loadTeamHeatmap() {
+  const teamRef = doc(db, 'teams', teamId);
+  const snap = await getDoc(teamRef);
+  const combinedGrid = createEmptyGrid();
+
+  if (!snap.exists()) return renderHeatmap(combinedGrid);
+
+  const players = snap.data().players || {};
+  for (const name in players) {
+    const playerGridObj = players[name];
+    for (let h = 0; h < hours; h++)
+      for (let d = 0; d < days; d++)
+        if (playerGridObj?.[h]?.[d]) combinedGrid[h][d]++;
+  }
+
+  renderHeatmap(combinedGrid);
+}
+
+loadTeamHeatmap();
+</script>
+</body>
+</html>
