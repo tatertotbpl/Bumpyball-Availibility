@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -6,30 +6,23 @@
 <title>Team Availability</title>
 <link rel="stylesheet" href="style.css">
 <style>
-  table { border-collapse: collapse; width: 100%; }
-  td, th { border: 1px solid #333; padding: 5px; text-align: center; }
-  .available { background-color: #6f6; }   /* green = yes */
-  .unavailable { background-color: #f66; } /* red = no */
-  .maybe { background-color: #ffa500; }    /* orange = maybe */
-  input, button, select { margin: 5px 0; }
-  #player-list { margin-top: 20px; padding: 10px; border: 1px solid #aaa; width: 200px; }
-  #player-list ul { list-style: none; padding-left: 0; }
-  #player-list li { padding: 4px; border-bottom: 1px solid #ccc; cursor: pointer; }
-  #player-list li:hover { background: #eee; }
-  #legend { margin-bottom: 10px; }
-  #legend span { display: inline-block; width: 80px; padding: 5px; margin: 0 5px; color: #fff; font-weight: bold; }
-  #legend .yes { background-color: #6f6; color: #000; }
-  #legend .maybe { background-color: #ffa500; color: #000; }
-  #legend .no { background-color: #f66; }
+  table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+  td, th { border: 1px solid #333; padding: 5px; text-align: center; cursor: pointer; }
+  #legend { margin: 10px auto; }
+  .legend-item { display: inline-block; margin: 0 10px; padding: 5px 10px; border: 1px solid #999; border-radius: 4px; }
+  .no { background-color: #f08080; }      /* red = no */
+  .maybe { background-color: #ffd580; }   /* orange = maybe */
+  .yes { background-color: #8fbc8f; }     /* green = yes */
 </style>
 </head>
 <body>
 <h1 id="team-name">Team Availability</h1>
 
+<!-- Legend -->
 <div id="legend">
-  <span class="no">No</span>
-  <span class="maybe">Maybe</span>
-  <span class="yes">Yes</span>
+  <span class="legend-item no">No</span>
+  <span class="legend-item maybe">Maybe</span>
+  <span class="legend-item yes">Yes</span>
 </div>
 
 <button onclick="window.location.href='dashboard.html?team=' + teamId">
@@ -116,11 +109,18 @@ function createEmptyGrid() {
   const grid = [];
   for (let h = 0; h < hours; h++) {
     grid[h] = [];
-    for (let d = 0; d < days; d++) grid[h][d] = 0; // 0 = red/no
+    for (let d = 0; d < days; d++) grid[h][d] = 0; // 0 = No
   }
   return grid;
 }
 
+function getClassForValue(val) {
+  if (val === 0) return 'no';
+  if (val === 1) return 'maybe';
+  if (val === 2) return 'yes';
+}
+
+// Populate grid
 function populateGrid(data) {
   gridBody.innerHTML = '';
   for (let h = 0; h < hours; h++) {
@@ -134,23 +134,18 @@ function populateGrid(data) {
     for (let d = 0; d < days; d++) {
       const val = data?.[h]?.[d] ?? 0;
       const cell = document.createElement('td');
+      cell.className = getClassForValue(val);
 
-      function updateCellColor() {
-        cell.classList.remove('available','unavailable','maybe');
-        if (gridData[h][d] === 0) cell.classList.add('unavailable');
-        else if (gridData[h][d] === 1) cell.classList.add('maybe');
-        else if (gridData[h][d] === 2) cell.classList.add('available');
-      }
-
+      // Cycle on click: 0 → 1 → 2 → 0
       cell.addEventListener('click', () => {
-        gridData[h][d] = (gridData[h][d] + 1) % 3; // cycles 0 → 1 → 2 → 0
-        updateCellColor();
+        gridData[h][d] = (gridData[h][d] + 1) % 3;
+        cell.className = getClassForValue(gridData[h][d]);
       });
 
       gridData[h][d] = val;
-      updateCellColor();
       row.appendChild(cell);
     }
+
     gridBody.appendChild(row);
   }
 }
@@ -158,18 +153,18 @@ function populateGrid(data) {
 // --- Firestore helpers ---
 function gridToFirestore(grid) {
   const out = {};
-  for (let h = 0; h < 24; h++) {
+  for (let h = 0; h < hours; h++) {
     out[h] = {};
-    for (let d = 0; d < 7; d++) out[h][d] = grid[h][d];
+    for (let d = 0; d < days; d++) out[h][d] = grid[h][d];
   }
   return out;
 }
 
 function firestoreToGrid(obj) {
   const grid = [];
-  for (let h = 0; h < 24; h++) {
+  for (let h = 0; h < hours; h++) {
     grid[h] = [];
-    for (let d = 0; d < 7; d++) grid[h][d] = obj?.[h]?.[d] ?? 0;
+    for (let d = 0; d < days; d++) grid[h][d] = obj?.[h]?.[d] ?? 0;
   }
   return grid;
 }
@@ -177,6 +172,7 @@ function firestoreToGrid(obj) {
 // --- Load Player Data ---
 async function loadPlayerData(name) {
   if (!name) return alert("Enter your name!");
+
   const snap = await getDoc(doc(db, 'teams', teamId));
   if (!snap.exists()) await setDoc(doc(db, 'teams', teamId), { players: {} });
 
@@ -186,7 +182,7 @@ async function loadPlayerData(name) {
     populateGrid(firestoreToGrid(stored.grid));
     if (stored.timezone) timezoneSelect.value = stored.timezone;
   } else {
-    populateGrid(createEmptyGrid());
+    populateGrid(createEmptyGrid()); // start all cells as No
   }
 
   await loadPlayerList();
