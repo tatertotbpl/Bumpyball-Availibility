@@ -1,31 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Team Heatmap</title>
 <link rel="stylesheet" href="style.css">
 <style>
-  table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-  td, th { border: 1px solid #333; padding: 5px; text-align: center; }
-  td { transition: background-color 0.2s; }
-  .time-cell { font-weight: bold; background-color: #eee; }
+  body{font-family:Arial,Helvetica,sans-serif;background:#f3f4f6;margin:0;padding:20px}
+  h1{color:#222}
+  table{border-collapse:collapse;width:100%;background:#fff}
+  th,td{border:1px solid #ddd;padding:6px;text-align:center;min-width:48px}
+  td.time-cell{font-weight:700;background:#fafafa}
+  td:hover{outline:2px solid rgba(0,0,0,.06)}
 </style>
 </head>
 <body>
 <h1 id="team-name">Team Heatmap</h1>
-
-<table id="heatmap-grid">
+<table id="heatmap-grid" aria-label="team heatmap">
   <thead>
     <tr>
-      <th>Time (UTC)</th>
-      <th>Mon</th>
-      <th>Tue</th>
-      <th>Wed</th>
-      <th>Thu</th>
-      <th>Fri</th>
-      <th>Sat</th>
-      <th>Sun</th>
+      <th>Time (UTC)</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
     </tr>
   </thead>
   <tbody></tbody>
@@ -35,7 +29,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
-// --- Firebase config ---
 const firebaseConfig = {
   apiKey: "AIzaSyAlpvgPbox4IvXQ74uvT7wx_Zv2ARwXaYY",
   authDomain: "smashkarts-availability.firebaseapp.com",
@@ -45,118 +38,92 @@ const firebaseConfig = {
   appId: "1:33863251672:web:ffc0d728fe31321c0809ad",
   measurementId: "G-8K3MEHMLRN"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// --- Page setup ---
 const urlParams = new URLSearchParams(window.location.search);
 const teamId = urlParams.get('team') || "team1";
-document.getElementById("team-name").innerText = `Team Heatmap: ${teamId}`;
+document.getElementById('team-name').innerText = `Team Heatmap: ${teamId}`;
 
-const gridBody = document.querySelector('#heatmap-grid tbody');
+const tbody = document.querySelector('#heatmap-grid tbody');
 const hours = 24;
 const days = 7;
+const tzOffsets = {'UTC':0,'EST':-5,'PST':-8,'CET':1,'GMT':0,'JST':9};
 
-// --- Timezone offsets ---
-const tzOffsets = {
-  'UTC': 0,
-  'EST': -5,
-  'PST': -8,
-  'CET': 1,
-  'GMT': 0,
-  'JST': 9
-};
-
-// --- Heatmap helpers ---
-function createEmptyGrid() {
-  const grid = [];
-  for (let h = 0; h < hours; h++) {
-    grid[h] = [];
-    for (let d = 0; d < days; d++) grid[h][d] = 0;
-  }
-  return grid;
+function createEmptyCombined(){
+  const g=[];
+  for(let h=0;h<hours;h++){ g[h]=[]; for(let d=0;d<days;d++){ g[h][d] = { total:0, list: [] }; } }
+  return g;
 }
-
-function getColor(count, max) {
-  if (!max) return '#eee';
-  const intensity = Math.round(255 - (count / max) * 200); // darker green = more players
+function getColor(count,max){
+  if(!max) return '#fff';
+  const ratio = Math.min(count / max, 1);
+  const intensity = Math.round(255 - ratio * 200);
   return `rgb(${intensity},255,${intensity})`;
 }
 
-function renderHeatmap(grid) {
-  gridBody.innerHTML = '';
-  let maxCount = 0;
-  for (let h = 0; h < hours; h++)
-    for (let d = 0; d < days; d++)
-      if (grid[h][d] > maxCount) maxCount = grid[h][d];
-
-  for (let h = 0; h < hours; h++) {
-    const row = document.createElement('tr');
-    const timeCell = document.createElement('td');
-    timeCell.textContent = `${h}:00`;
-    timeCell.classList.add('time-cell');
-    row.appendChild(timeCell);
-
-    for (let d = 0; d < days; d++) {
-      const cell = document.createElement('td');
-      const count = grid[h][d];
-      cell.style.backgroundColor = getColor(count, maxCount);
-      cell.textContent = count; // shows total count including 0.5 maybe
-      row.appendChild(cell);
-    }
-
-    gridBody.appendChild(row);
-  }
-}
-
-// Convert player grid → UTC based on timezone
-// 0 = no, 1 = maybe, 2 = yes
-function convertPlayerGridToUTC(playerGrid, tz) {
-  const converted = createEmptyGrid();
+// convert a player's stored grid (object 0/1/2) from their timezone -> UTC positions (keeps original numeric val)
+function convertPlayerGridToUTC(playerGridObj, tz){
+  const out = [];
+  for(let h=0;h<hours;h++){ out[h]=[]; for(let d=0;d<days;d++) out[h][d] = 0; }
   const offset = tzOffsets[tz] ?? 0;
-
-  for (let h = 0; h < hours; h++) {
-    for (let d = 0; d < days; d++) {
-      const val = playerGrid[h][d];
-      if (!val) continue; // 0 = no
-
-      let utcHour = (h - offset + 24) % 24;
-      let dayShift = (h - offset < 0 ? -1 : h - offset >= 24 ? 1 : 0);
-      let utcDay = (d + dayShift + 7) % 7;
-
-      // Store the original value (1=maybe, 2=yes)
-      converted[utcHour][utcDay] = val;
+  for(let h=0; h<hours; h++){
+    for(let d=0; d<days; d++){
+      const val = playerGridObj?.[h]?.[d] ?? 0;
+      if(!val) continue;
+      const utcHour = (h - offset + 24) % 24;
+      let dayShift = (h - offset < 0 ? -1 : (h - offset >= 24 ? 1 : 0));
+      const utcDay = (d + dayShift + 7) % 7;
+      // if multiple players produce same cell we'll accumulate in dashboard logic
+      out[utcHour][utcDay] = val;
     }
   }
-
-  return converted;
+  return out;
 }
 
-// --- Load team heatmap ---
-async function loadTeamHeatmap() {
-  const teamRef = doc(db, 'teams', teamId);
-  const snap = await getDoc(teamRef);
-  const combinedGrid = createEmptyGrid();
+function renderHeatmap(combined){
+  tbody.innerHTML = '';
+  // compute max for color scaling
+  let max = 0;
+  for(let h=0;h<hours;h++) for(let d=0;d<days;d++) if(combined[h][d].total > max) max = combined[h][d].total;
+  for(let h=0;h<hours;h++){
+    const tr = document.createElement('tr');
+    const tcell = document.createElement('td'); tcell.className='time-cell'; tcell.textContent = `${h}:00`; tr.appendChild(tcell);
+    for(let d=0; d<days; d++){
+      const cell = document.createElement('td');
+      const meta = combined[h][d];
+      cell.style.backgroundColor = getColor(meta.total, max);
+      // show total with one decimal if needed
+      cell.textContent = (Math.round(meta.total*10)/10).toString();
+      // tooltip: show individual statuses
+      const lines = meta.list.length ? meta.list : ['(no submissions)'];
+      cell.title = lines.join('\n');
+      tr.appendChild(cell);
+    }
+    tbody.appendChild(tr);
+  }
+}
 
-  if (!snap.exists()) return renderHeatmap(combinedGrid);
-
+async function loadTeamHeatmap(){
+  const snap = await getDoc(doc(db,'teams',teamId));
+  const combined = createEmptyCombined();
+  if(!snap.exists()){ renderHeatmap(combined); return; }
   const players = snap.data().players || {};
-  for (const name in players) {
-    const grid = players[name].grid ?? createEmptyGrid();
-    const tz = players[name].timezone ?? 'UTC';
-    const utcGrid = convertPlayerGridToUTC(grid, tz);
-
-    for (let h = 0; h < hours; h++) {
-      for (let d = 0; d < days; d++) {
+  for(const name in players){
+    const p = players[name];
+    const gridObj = p.grid || {}; // stored grid object with numeric vals
+    const tz = p.timezone || 'UTC';
+    const utcGrid = convertPlayerGridToUTC(gridObj, tz);
+    for(let h=0;h<hours;h++){
+      for(let d=0;d<days;d++){
         const val = utcGrid[h][d];
-        if (val === 1) combinedGrid[h][d] += 0.5; // maybe
-        else if (val === 2) combinedGrid[h][d] += 1; // yes
+        if(val===1){ combined[h][d].total += 0.5; combined[h][d].list.push(`${name} — Maybe`); }
+        else if(val===2){ combined[h][d].total += 1; combined[h][d].list.push(`${name} — Yes`); }
+        else { combined[h][d].list.push(`${name} — No`); }
       }
     }
   }
-
-  renderHeatmap(combinedGrid);
+  renderHeatmap(combined);
 }
 
 loadTeamHeatmap();
