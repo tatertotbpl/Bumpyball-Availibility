@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smashkarts Availability</title>
+    <title>Smashkarts Team Availability</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Smashkarts Team Availability</h1>
+    <h1 id="team-name">Team Availability</h1>
 
     <div class="timezone-selector">
         <label for="timezone">Select your timezone:</label>
@@ -20,6 +20,8 @@
             <option value="Asia/Tokyo">JST</option>
         </select>
     </div>
+
+    <button id="saveButton">Save Availability</button>
 
     <table id="availability-grid">
         <thead>
@@ -39,6 +41,97 @@
         </tbody>
     </table>
 
-    <script src="script.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-firestore-compat.js"></script>
+
+    <script>
+    // ====== CONFIG ======
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT_ID.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // ====== TEAM SETUP ======
+    const urlParams = new URLSearchParams(window.location.search);
+    const teamId = urlParams.get('team') || "team1"; // default
+    document.getElementById("team-name").innerText = `Availability: ${teamId}`;
+
+    const gridBody = document.querySelector('#availability-grid tbody');
+    const timezoneSelect = document.getElementById('timezone');
+    const saveButton = document.getElementById('saveButton');
+
+    const startHour = 0;
+    const endHour = 23;
+    let gridData = [];
+
+    // Convert hour to selected timezone
+    function convertHour(hour, tz) {
+        const date = new Date();
+        date.setUTCHours(hour, 0, 0, 0);
+        return date.toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false, timeZone: tz});
+    }
+
+    // Populate table rows
+    function populateGrid(data) {
+        gridBody.innerHTML = '';
+        const tz = timezoneSelect.value;
+
+        for (let hour = startHour; hour <= endHour; hour++) {
+            const row = document.createElement('tr');
+
+            const timeCell = document.createElement('td');
+            timeCell.textContent = convertHour(hour, tz);
+            row.appendChild(timeCell);
+
+            gridData[hour] = gridData[hour] || [];
+
+            for (let day = 0; day < 7; day++) {
+                const cell = document.createElement('td');
+                const available = data?.[hour]?.[day] || false;
+                cell.classList.add(available ? 'available' : 'unavailable');
+
+                cell.addEventListener('click', () => {
+                    cell.classList.toggle('available');
+                    cell.classList.toggle('unavailable');
+                    gridData[hour][day] = !gridData[hour][day];
+                });
+
+                gridData[hour][day] = available;
+                row.appendChild(cell);
+            }
+
+            gridBody.appendChild(row);
+        }
+    }
+
+    // ====== LOAD DATA ======
+    const teamDoc = db.collection('teams').doc(teamId);
+    teamDoc.get().then(doc => {
+        if (doc.exists) {
+            populateGrid(doc.data().availability);
+        } else {
+            populateGrid([]);
+        }
+    });
+
+    // ====== SAVE DATA ======
+    saveButton.addEventListener('click', () => {
+        teamDoc.set({ availability: gridData })
+        .then(() => alert('Availability saved!'))
+        .catch(err => console.error(err));
+    });
+
+    // ====== TIMEZONE CHANGE ======
+    timezoneSelect.addEventListener('change', () => {
+        populateGrid(gridData); // refresh times in new TZ
+    });
+    </script>
 </body>
 </html>
