@@ -35,7 +35,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
-// --- Firebase config ---
+// --- Firebase ---
 const firebaseConfig = {
   apiKey: "AIzaSyAlpvgPbox4IvXQ74uvT7wx_Zv2ARwXaYY",
   authDomain: "smashkarts-availability.firebaseapp.com",
@@ -58,6 +58,16 @@ const gridBody = document.querySelector('#heatmap-grid tbody');
 const hours = 24;
 const days = 7;
 
+// --- Timezone offsets ---
+const tzOffsets = {
+  'UTC': 0,
+  'EST': -5,
+  'PST': -8,
+  'CET': 1,
+  'GMT': 0,
+  'JST': 9
+};
+
 // --- Heatmap helpers ---
 function createEmptyGrid() {
   const grid = [];
@@ -68,14 +78,12 @@ function createEmptyGrid() {
   return grid;
 }
 
-// Map number of available players → color intensity
 function getColor(count, max) {
   if (!max) return '#eee';
-  const intensity = Math.round(255 - (count / max) * 200); // higher count = darker green
+  const intensity = Math.round(255 - (count / max) * 200);
   return `rgb(${intensity},255,${intensity})`;
 }
 
-// Render the combined grid
 function renderHeatmap(grid) {
   gridBody.innerHTML = '';
   let maxCount = 0;
@@ -102,18 +110,18 @@ function renderHeatmap(grid) {
   }
 }
 
-// Convert a player's grid from their timezone → UTC
+// Convert player grid → UTC based on their timezone
 function convertPlayerGridToUTC(playerGrid, tz) {
   const converted = createEmptyGrid();
+  const offset = tzOffsets[tz] ?? 0;
 
   for (let h = 0; h < hours; h++) {
     for (let d = 0; d < days; d++) {
       if (!playerGrid[h][d]) continue;
 
-      // Convert the hour in player's timezone to UTC hour
-      const localDate = new Date(Date.UTC(2025, 11, 8 + d, h, 0));
-      const utcHour = Number(localDate.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', timeZone: 'UTC' }));
-      const utcDay = localDate.getUTCDay();
+      let utcHour = (h - offset + 24) % 24;
+      let dayShift = (h - offset < 0 ? -1 : h - offset >= 24 ? 1 : 0);
+      let utcDay = (d + dayShift + 7) % 7;
 
       converted[utcHour][utcDay] = true;
     }
@@ -132,9 +140,8 @@ async function loadTeamHeatmap() {
 
   const players = snap.data().players || {};
   for (const name in players) {
-    const playerData = players[name];
-    const grid = playerData.grid || createEmptyGrid();
-    const tz = playerData.timezone || 'UTC';
+    const grid = players[name].grid ?? createEmptyGrid();
+    const tz = players[name].timezone ?? 'UTC';
     const utcGrid = convertPlayerGridToUTC(grid, tz);
 
     for (let h = 0; h < hours; h++)
