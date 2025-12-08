@@ -65,11 +65,11 @@
 
 <button id="saveButton">Save Availability</button>
 
+<!-- keep all your current HTML/CSS, just update the script part -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
-// --- Firebase ---
 const firebaseConfig = {
   apiKey: "AIzaSyAlpvgPbox4IvXQ74uvT7wx_Zv2ARwXaYY",
   authDomain: "smashkarts-availability.firebaseapp.com",
@@ -79,11 +79,9 @@ const firebaseConfig = {
   appId: "1:33863251672:web:ffc0d728fe31321c0809ad",
   measurementId: "G-8K3MEHMLRN"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// --- Page setup ---
 const urlParams = new URLSearchParams(window.location.search);
 const teamId = urlParams.get('team') || "team1";
 window.teamId = teamId;
@@ -95,129 +93,130 @@ const loadButton = document.getElementById('loadButton');
 const saveButton = document.getElementById('saveButton');
 const timezoneSelect = document.getElementById('timezone');
 
-const hours = 24;
-const days = 7;
+const hours = 24, days = 7;
 let gridData = [];
 
-// --- Grid helpers ---
+// --- timezone offsets in hours ---
+const tzOffsets = { 'UTC':0,'EST':-5,'PST':-8,'CET':1,'GMT':0,'JST':9 };
+
+// --- helpers ---
 function createEmptyGrid() {
-  const grid = [];
-  for (let h = 0; h < hours; h++) {
-    grid[h] = [];
-    for (let d = 0; d < days; d++) grid[h][d] = false;
-  }
-  return grid;
+  const g = [];
+  for(let h=0;h<hours;h++){ g[h]=[]; for(let d=0;d<days;d++) g[h][d]=false; }
+  return g;
 }
 
-function populateGrid(data) {
-  gridBody.innerHTML = '';
-  for (let h = 0; h < hours; h++) {
-    const row = document.createElement('tr');
-    const timeCell = document.createElement('td');
-    timeCell.textContent = `${h}:00`;
-    row.appendChild(timeCell);
-
-    gridData[h] = gridData[h] || [];
-
-    for (let d = 0; d < days; d++) {
-      const val = data?.[h]?.[d] || false;
-      const cell = document.createElement('td');
-      cell.classList.add(val ? 'available' : 'unavailable');
-
-      cell.addEventListener('click', () => {
-        const now = !gridData[h][d];
-        gridData[h][d] = now;
-        cell.classList.toggle('available');
-        cell.classList.toggle('unavailable');
-      });
-
-      gridData[h][d] = val;
-      row.appendChild(cell);
+// convert grid from UTC → local tz for display
+function convertGridFromUTC(grid, tz) {
+  const offset = tzOffsets[tz] ?? 0;
+  const out = createEmptyGrid();
+  for(let h=0;h<hours;h++){
+    for(let d=0;d<days;d++){
+      if(grid[h][d]){
+        let localHour = (h + offset + 24) % 24;
+        let dayShift = Math.floor((h + offset) / 24);
+        let localDay = (d + dayShift + 7) % 7;
+        out[localHour][localDay] = true;
+      }
     }
-
-    gridBody.appendChild(row);
-  }
-}
-
-// --- Firestore helpers ---
-function gridToFirestore(grid) {
-  const out = {};
-  for (let h = 0; h < 24; h++) {
-    out[h] = {};
-    for (let d = 0; d < 7; d++) out[h][d] = !!grid[h][d];
   }
   return out;
 }
 
-function firestoreToGrid(obj) {
-  const grid = [];
-  for (let h = 0; h < 24; h++) {
-    grid[h] = [];
-    for (let d = 0; d < 7; d++) grid[h][d] = obj?.[h]?.[d] || false;
+// convert grid from local tz → UTC for saving
+function convertGridToUTC(grid, tz){
+  const offset = tzOffsets[tz] ?? 0;
+  const out = createEmptyGrid();
+  for(let h=0;h<hours;h++){
+    for(let d=0;d<days;d++){
+      if(grid[h][d]){
+        let utcHour = (h - offset + 24) % 24;
+        let dayShift = (h - offset < 0 ? -1 : h - offset >= 24 ? 1 : 0);
+        let utcDay = (d + dayShift + 7) % 7;
+        out[utcHour][utcDay] = true;
+      }
+    }
   }
-  return grid;
+  return out;
 }
 
-// --- Load Player Data ---
-async function loadPlayerData(name) {
-  if (!name) return alert("Enter your name!");
-
-  const snap = await getDoc(doc(db, 'teams', teamId));
-  if (!snap.exists()) await setDoc(doc(db, 'teams', teamId), { players: {} });
-
-  const stored = snap.exists() ? snap.data().players?.[name] : null;
-
-  if (stored) {
-    populateGrid(firestoreToGrid(stored.grid));
-    if (stored.timezone) timezoneSelect.value = stored.timezone;
-  } else {
-    populateGrid(createEmptyGrid());
+// populate table
+function populateGrid(data){
+  gridBody.innerHTML='';
+  for(let h=0;h<hours;h++){
+    const row = document.createElement('tr');
+    const timeCell = document.createElement('td'); timeCell.textContent=`${h}:00`; row.appendChild(timeCell);
+    gridData[h] = gridData[h] || [];
+    for(let d=0;d<days;d++){
+      const val = data?.[h]?.[d] || false;
+      const cell = document.createElement('td');
+      cell.classList.add(val?'available':'unavailable');
+      cell.addEventListener('click',()=>{
+        gridData[h][d] = !gridData[h][d];
+        cell.classList.toggle('available'); cell.classList.toggle('unavailable');
+      });
+      gridData[h][d] = val;
+      row.appendChild(cell);
+    }
+    gridBody.appendChild(row);
   }
+}
 
+// Firestore helpers
+function gridToFirestore(grid){ return grid; }
+function firestoreToGrid(obj){ return obj; }
+
+// load player
+async function loadPlayerData(name){
+  if(!name) return alert("Enter your name!");
+  const snap = await getDoc(doc(db,'teams',teamId));
+  if(!snap.exists()) await setDoc(doc(db,'teams',teamId),{players:{}});
+  const stored = snap.exists()? snap.data().players?.[name]: null;
+  if(stored){
+    const tz = stored.timezone || 'UTC';
+    timezoneSelect.value = tz;
+    populateGrid(convertGridFromUTC(stored.grid, tz));
+  } else populateGrid(createEmptyGrid());
   await loadPlayerList();
 }
 
-// --- Save Player Data ---
-async function savePlayerData(name) {
-  if (!name) return alert("Enter your name!");
+// save player
+async function savePlayerData(name){
+  if(!name) return alert("Enter your name!");
   const tz = timezoneSelect.value;
-  const firestoreGrid = gridToFirestore(gridData);
-
-  await setDoc(doc(db, 'teams', teamId), {
-    players: { [name]: { grid: firestoreGrid, timezone: tz } }
-  }, { merge: true });
-
+  const utcGrid = convertGridToUTC(gridData, tz);
+  await setDoc(doc(db,'teams',teamId),{
+    players: {[name]: {grid:utcGrid, timezone:tz}}
+  }, {merge:true});
   alert("Saved!");
   await loadPlayerList();
 }
 
-// --- Player List ---
-async function loadPlayerList() {
-  const snap = await getDoc(doc(db, 'teams', teamId));
-  if (!snap.exists()) return;
+// load player list
+async function loadPlayerList(){
+  const snap = await getDoc(doc(db,'teams',teamId));
+  if(!snap.exists()) return;
   const players = snap.data().players || {};
   const list = document.getElementById("players-ul");
-  list.innerHTML = "";
-
-  Object.keys(players).forEach(player => {
-    const li = document.createElement("li");
+  list.innerHTML='';
+  Object.keys(players).forEach(player=>{
+    const li = document.createElement('li');
     li.textContent = player;
-
-    li.addEventListener("click", () => {
+    li.addEventListener('click',()=>{
       playerInput.value = player;
-      populateGrid(firestoreToGrid(players[player].grid));
-      if (players[player].timezone) timezoneSelect.value = players[player].timezone;
+      const tz = players[player].timezone || 'UTC';
+      timezoneSelect.value = tz;
+      populateGrid(convertGridFromUTC(players[player].grid, tz));
     });
-
     list.appendChild(li);
   });
 }
 
-// --- Button events ---
-loadButton.addEventListener('click', () => loadPlayerData(playerInput.value.trim()));
-saveButton.addEventListener('click', () => savePlayerData(playerInput.value.trim()));
+// events
+loadButton.addEventListener('click',()=>loadPlayerData(playerInput.value.trim()));
+saveButton.addEventListener('click',()=>savePlayerData(playerInput.value.trim()));
 
-// --- Init ---
+// init
 populateGrid(createEmptyGrid());
 loadPlayerList();
 </script>
