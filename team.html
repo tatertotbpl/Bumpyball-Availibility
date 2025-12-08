@@ -1,75 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Team Availability</title>
-  <link rel="stylesheet" href="style.css">
-  <style>
-    table { border-collapse: collapse; width: 100%; }
-    td, th { border: 1px solid #333; padding: 5px; text-align: center; }
-    .available { background-color: #6f6; }
-    .unavailable { background-color: #f66; }
-    input, button, select { margin: 5px 0; }
-    #player-list { margin-top: 20px; padding: 10px; border: 1px solid #aaa; width: 200px; }
-    #player-list ul { list-style: none; padding-left: 0; }
-    #player-list li { padding: 4px; border-bottom: 1px solid #ccc; cursor: pointer; }
-    #player-list li:hover { background: #eee; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Availability</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  table { border-collapse: collapse; width: 100%; }
+  td, th { border: 1px solid #333; padding: 5px; text-align: center; }
+  .available { background-color: #6f6; }
+  .unavailable { background-color: #f66; }
+  input, button, select { margin: 5px 0; }
+  #player-list { margin-top: 20px; padding: 10px; border: 1px solid #aaa; width: 200px; }
+  #player-list ul { list-style: none; padding-left: 0; }
+  #player-list li { padding: 4px; border-bottom: 1px solid #ccc; cursor: pointer; }
+  #player-list li:hover { background: #eee; }
+</style>
 </head>
 <body>
-  <h1 id="team-name">Team Availability</h1>
+<h1 id="team-name">Team Availability</h1>
 
-  <button onclick="window.location.href='dashboard.html?team=' + teamId">
-    Open Team Dashboard
-  </button>
+<button onclick="window.location.href='dashboard.html?team=' + teamId">
+  Open Team Dashboard
+</button>
 
-  <div class="player-input">
-    <label for="player-name">Player Name:</label>
-    <input type="text" id="player-name" placeholder="Your Name">
-    <button id="loadButton">Load Grid</button>
-  </div>
+<div class="player-input">
+  <label for="player-name">Player Name:</label>
+  <input type="text" id="player-name" placeholder="Your Name">
+  <button id="loadButton">Load Grid</button>
+</div>
 
-  <div id="player-list">
-    <h3>Players</h3>
-    <ul id="players-ul"></ul>
-  </div>
+<div id="player-list">
+  <h3>Players</h3>
+  <ul id="players-ul"></ul>
+</div>
 
-  <div class="timezone-selector">
-    <label for="timezone">Select your timezone:</label>
-    <select id="timezone">
-      <option value="UTC">UTC</option>
-      <option value="America/New_York">EST</option>
-      <option value="America/Los_Angeles">PST</option>
-      <option value="Europe/London">GMT</option>
-      <option value="Europe/Berlin">CET</option>
-      <option value="Asia/Tokyo">JST</option>
-    </select>
-  </div>
+<div class="timezone-selector">
+  <label for="timezone">Select your timezone:</label>
+  <select id="timezone">
+    <option value="UTC">UTC</option>
+    <option value="EST">EST</option>
+    <option value="PST">PST</option>
+    <option value="CET">CET</option>
+    <option value="GMT">GMT</option>
+    <option value="JST">JST</option>
+  </select>
+</div>
 
-  <table id="availability-grid">
-    <thead>
-      <tr>
-        <th>Time</th>
-        <th>Mon</th>
-        <th>Tue</th>
-        <th>Wed</th>
-        <th>Thu</th>
-        <th>Fri</th>
-        <th>Sat</th>
-        <th>Sun</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<table id="availability-grid">
+  <thead>
+    <tr>
+      <th>Time</th>
+      <th>Mon</th>
+      <th>Tue</th>
+      <th>Wed</th>
+      <th>Thu</th>
+      <th>Fri</th>
+      <th>Sat</th>
+      <th>Sun</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
 
-  <button id="saveButton">Save Availability</button>
+<button id="saveButton">Save Availability</button>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
-// ---- Firebase ----
+// --- Firebase ---
 const firebaseConfig = {
   apiKey: "AIzaSyAlpvgPbox4IvXQ74uvT7wx_Zv2ARwXaYY",
   authDomain: "smashkarts-availability.firebaseapp.com",
@@ -83,9 +83,10 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// ---- Page setup ----
+// --- Page setup ---
 const urlParams = new URLSearchParams(window.location.search);
-window.teamId = urlParams.get('team') || "team1";
+const teamId = urlParams.get('team') || "team1";
+window.teamId = teamId;
 document.getElementById("team-name").innerText = `Availability: ${teamId}`;
 
 const gridBody = document.querySelector('#availability-grid tbody');
@@ -94,44 +95,52 @@ const loadButton = document.getElementById('loadButton');
 const saveButton = document.getElementById('saveButton');
 const timezoneSelect = document.getElementById('timezone');
 
-const startHour = 0;
-const endHour = 23;
+const hours = 24;
+const days = 7;
 let gridData = [];
 
-const teamRef = doc(db, 'teams', teamId);
+// --- Grid helpers ---
+function createEmptyGrid() {
+  const grid = [];
+  for (let h = 0; h < hours; h++) {
+    grid[h] = [];
+    for (let d = 0; d < days; d++) grid[h][d] = false;
+  }
+  return grid;
+}
 
-// ---- Grid Renderer ----
 function populateGrid(data) {
   gridBody.innerHTML = '';
-  for (let hour = startHour; hour <= endHour; hour++) {
+  for (let h = 0; h < hours; h++) {
     const row = document.createElement('tr');
     const timeCell = document.createElement('td');
-    timeCell.textContent = `${hour}:00`;
+    timeCell.textContent = `${h}:00`;
     row.appendChild(timeCell);
 
-    gridData[hour] = gridData[hour] || [];
+    gridData[h] = gridData[h] || [];
 
-    for (let day = 0; day < 7; day++) {
-      const val = data?.[hour]?.[day] || false;
+    for (let d = 0; d < days; d++) {
+      const val = data?.[h]?.[d] || false;
       const cell = document.createElement('td');
       cell.classList.add(val ? 'available' : 'unavailable');
 
       cell.addEventListener('click', () => {
-        const now = !gridData[hour][day];
-        gridData[hour][day] = now;
+        const now = !gridData[h][d];
+        gridData[h][d] = now;
         cell.classList.toggle('available');
         cell.classList.toggle('unavailable');
       });
 
-      gridData[hour][day] = val;
+      gridData[h][d] = val;
       row.appendChild(cell);
     }
+
     gridBody.appendChild(row);
   }
 }
 
-// ---- Firestore conversion helpers ----
-function gridToFirestoreObject(grid) {
+// --- Firestore helpers ---
+function gridToFirestore(grid) {
   const out = {};
   for (let h = 0; h < 24; h++) {
     out[h] = {};
@@ -140,7 +149,7 @@ function gridToFirestoreObject(grid) {
   return out;
 }
 
-function firestoreObjectToGrid(obj) {
+function firestoreToGrid(obj) {
   const grid = [];
   for (let h = 0; h < 24; h++) {
     grid[h] = [];
@@ -149,48 +158,43 @@ function firestoreObjectToGrid(obj) {
   return grid;
 }
 
-// ---- Load Player Data ----
+// --- Load Player Data ---
 async function loadPlayerData(name) {
   if (!name) return alert("Enter your name!");
 
-  const snap = await getDoc(teamRef);
-  if (!snap.exists()) await setDoc(teamRef, { players: {} });
+  const snap = await getDoc(doc(db, 'teams', teamId));
+  if (!snap.exists()) await setDoc(doc(db, 'teams', teamId), { players: {} });
 
   const stored = snap.exists() ? snap.data().players?.[name] : null;
 
   if (stored) {
-    populateGrid(firestoreObjectToGrid(stored.grid));
+    populateGrid(firestoreToGrid(stored.grid));
     if (stored.timezone) timezoneSelect.value = stored.timezone;
-    convertGridToTimezone(stored.timezone);
   } else {
-    populateGrid([]);
+    populateGrid(createEmptyGrid());
   }
 
   await loadPlayerList();
 }
 
-// ---- Save Player Data ----
+// --- Save Player Data ---
 async function savePlayerData(name) {
   if (!name) return alert("Enter your name!");
-
-  const firestoreGrid = gridToFirestoreObject(gridData);
   const tz = timezoneSelect.value;
+  const firestoreGrid = gridToFirestore(gridData);
 
-  await setDoc(
-    teamRef,
-    { players: { [name]: { grid: firestoreGrid, timezone: tz } } },
-    { merge: true }
-  );
+  await setDoc(doc(db, 'teams', teamId), {
+    players: { [name]: { grid: firestoreGrid, timezone: tz } }
+  }, { merge: true });
 
   alert("Saved!");
   await loadPlayerList();
 }
 
-// ---- Player List Loader ----
+// --- Player List ---
 async function loadPlayerList() {
-  const snap = await getDoc(teamRef);
+  const snap = await getDoc(doc(db, 'teams', teamId));
   if (!snap.exists()) return;
-
   const players = snap.data().players || {};
   const list = document.getElementById("players-ul");
   list.innerHTML = "";
@@ -201,43 +205,20 @@ async function loadPlayerList() {
 
     li.addEventListener("click", () => {
       playerInput.value = player;
-      populateGrid(firestoreObjectToGrid(players[player].grid));
+      populateGrid(firestoreToGrid(players[player].grid));
       if (players[player].timezone) timezoneSelect.value = players[player].timezone;
-      convertGridToTimezone(players[player].timezone);
     });
 
     list.appendChild(li);
   });
 }
 
-// ---- Timezone Conversion ----
-function convertGridToTimezone(tz) {
-  for (let hour = 0; hour <= 23; hour++) {
-    const timeCell = gridBody.rows[hour]?.cells[0];
-    if (timeCell) {
-      const utcDate = new Date(Date.UTC(2025, 11, 8, hour, 0));
-      const tzHour = utcDate.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', timeZone: tz });
-      timeCell.textContent = `${tzHour}:00`;
-    }
-  }
-}
+// --- Button events ---
+loadButton.addEventListener('click', () => loadPlayerData(playerInput.value.trim()));
+saveButton.addEventListener('click', () => savePlayerData(playerInput.value.trim()));
 
-// ---- Button Events ----
-loadButton.addEventListener('click', () =>
-  loadPlayerData(playerInput.value.trim())
-);
-
-saveButton.addEventListener('click', () =>
-  savePlayerData(playerInput.value.trim())
-);
-
-timezoneSelect.addEventListener('change', () => {
-  const tz = timezoneSelect.value;
-  convertGridToTimezone(tz);
-});
-
-// ---- Init ----
-populateGrid([]);
+// --- Init ---
+populateGrid(createEmptyGrid());
 loadPlayerList();
 </script>
 </body>
