@@ -13,6 +13,7 @@
   .no { background-color: #f08080; }      /* red = no */
   .maybe { background-color: #ffd580; }   /* orange = maybe */
   .yes { background-color: #8fbc8f; }     /* green = yes */
+  #player-list button { width: 100%; cursor: pointer; margin: 2px 0; }
 </style>
 </head>
 <body>
@@ -212,14 +213,14 @@ async function loadPlayerList() {
 
   Object.keys(players).forEach(player => {
     const li = document.createElement("li");
-    li.textContent = player;
-
-    li.addEventListener("click", () => {
+    const btn = document.createElement("button");
+    btn.textContent = player;
+    btn.addEventListener("click", () => {
       playerInput.value = player;
       populateGrid(firestoreToGrid(players[player].grid));
       if (players[player].timezone) timezoneSelect.value = players[player].timezone;
     });
-
+    li.appendChild(btn);
     list.appendChild(li);
   });
 }
@@ -234,3 +235,4 @@ loadPlayerList();
 </script>
 </body>
 </html>
+
