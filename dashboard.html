@@ -18,7 +18,7 @@
 <table id="heatmap-grid">
   <thead>
     <tr>
-      <th>Time</th>
+      <th>Time (UTC)</th>
       <th>Mon</th>
       <th>Tue</th>
       <th>Wed</th>
@@ -58,7 +58,7 @@ const gridBody = document.querySelector('#heatmap-grid tbody');
 const hours = 24;
 const days = 7;
 
-// --- Heatmap functions ---
+// --- Heatmap helpers ---
 function createEmptyGrid() {
   const grid = [];
   for (let h = 0; h < hours; h++) {
@@ -75,6 +75,7 @@ function getColor(count, max) {
   return `rgb(${intensity},255,${intensity})`;
 }
 
+// Render the combined grid
 function renderHeatmap(grid) {
   gridBody.innerHTML = '';
   let maxCount = 0;
@@ -93,7 +94,7 @@ function renderHeatmap(grid) {
       const cell = document.createElement('td');
       const count = grid[h][d];
       cell.style.backgroundColor = getColor(count, maxCount);
-      cell.textContent = count; // shows number of available players
+      cell.textContent = count;
       row.appendChild(cell);
     }
 
@@ -101,7 +102,27 @@ function renderHeatmap(grid) {
   }
 }
 
-// --- Load data ---
+// Convert a player's grid from their timezone → UTC
+function convertPlayerGridToUTC(playerGrid, tz) {
+  const converted = createEmptyGrid();
+
+  for (let h = 0; h < hours; h++) {
+    for (let d = 0; d < days; d++) {
+      if (!playerGrid[h][d]) continue;
+
+      // Convert the hour in player's timezone to UTC hour
+      const localDate = new Date(Date.UTC(2025, 11, 8 + d, h, 0));
+      const utcHour = Number(localDate.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', timeZone: 'UTC' }));
+      const utcDay = localDate.getUTCDay();
+
+      converted[utcHour][utcDay] = true;
+    }
+  }
+
+  return converted;
+}
+
+// --- Load team heatmap ---
 async function loadTeamHeatmap() {
   const teamRef = doc(db, 'teams', teamId);
   const snap = await getDoc(teamRef);
@@ -111,10 +132,14 @@ async function loadTeamHeatmap() {
 
   const players = snap.data().players || {};
   for (const name in players) {
-    const playerGridObj = players[name];
+    const playerData = players[name];
+    const grid = playerData.grid || createEmptyGrid();
+    const tz = playerData.timezone || 'UTC';
+    const utcGrid = convertPlayerGridToUTC(grid, tz);
+
     for (let h = 0; h < hours; h++)
       for (let d = 0; d < days; d++)
-        if (playerGridObj?.[h]?.[d]) combinedGrid[h][d]++;
+        if (utcGrid[h][d]) combinedGrid[h][d]++;
   }
 
   renderHeatmap(combinedGrid);
