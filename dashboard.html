@@ -80,7 +80,7 @@ function createEmptyGrid() {
 
 function getColor(count, max) {
   if (!max) return '#eee';
-  const intensity = Math.round(255 - (count / max) * 200);
+  const intensity = Math.round(255 - (count / max) * 200); // darker green = more players
   return `rgb(${intensity},255,${intensity})`;
 }
 
@@ -102,7 +102,7 @@ function renderHeatmap(grid) {
       const cell = document.createElement('td');
       const count = grid[h][d];
       cell.style.backgroundColor = getColor(count, maxCount);
-      cell.textContent = count;
+      cell.textContent = count; // shows total count including 0.5 maybe
       row.appendChild(cell);
     }
 
@@ -110,18 +110,23 @@ function renderHeatmap(grid) {
   }
 }
 
-// Convert player grid → UTC based on their timezone
+// Convert player grid → UTC based on timezone
+// 0 = no, 1 = maybe, 2 = yes
 function convertPlayerGridToUTC(playerGrid, tz) {
   const converted = createEmptyGrid();
   const offset = tzOffsets[tz] ?? 0;
 
   for (let h = 0; h < hours; h++) {
     for (let d = 0; d < days; d++) {
-      if (!playerGrid[h][d]) continue;
+      const val = playerGrid[h][d];
+      if (!val) continue; // 0 = no
+
       let utcHour = (h - offset + 24) % 24;
       let dayShift = (h - offset < 0 ? -1 : h - offset >= 24 ? 1 : 0);
       let utcDay = (d + dayShift + 7) % 7;
-      converted[utcHour][utcDay] = true;
+
+      // Store the original value (1=maybe, 2=yes)
+      converted[utcHour][utcDay] = val;
     }
   }
 
@@ -142,9 +147,13 @@ async function loadTeamHeatmap() {
     const tz = players[name].timezone ?? 'UTC';
     const utcGrid = convertPlayerGridToUTC(grid, tz);
 
-    for (let h = 0; h < hours; h++)
-      for (let d = 0; d < days; d++)
-        if (utcGrid[h][d]) combinedGrid[h][d]++;
+    for (let h = 0; h < hours; h++) {
+      for (let d = 0; d < days; d++) {
+        const val = utcGrid[h][d];
+        if (val === 1) combinedGrid[h][d] += 0.5; // maybe
+        else if (val === 2) combinedGrid[h][d] += 1; // yes
+      }
+    }
   }
 
   renderHeatmap(combinedGrid);
@@ -154,4 +163,3 @@ loadTeamHeatmap();
 </script>
 </body>
 </html>
-
