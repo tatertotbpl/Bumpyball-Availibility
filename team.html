@@ -10,21 +10,18 @@
   main { max-width:1100px; margin:0 auto; padding-right: calc(var(--sidebar-w) + 20px); }
   h1 { margin:0 0 10px 0; color:#222; }
   
-  /* legend */
   #legend { margin:10px 0; }
   .legend-item { display:inline-block; margin:0 8px; padding:6px 10px; border-radius:6px; border:1px solid #bbb; font-weight:600; }
   .no { background:#f08080; color:#000; }
   .maybe { background:#ffd580; color:#000; }
   .yes { background:#8fbc8f; color:#000; }
 
-  /* table */
   table { border-collapse:collapse; width:100%; background:#fff; box-shadow:0 1px 0 rgba(0,0,0,.06); }
   th, td { border:1px solid #ddd; padding:6px; text-align:center; min-width:48px; cursor:pointer; }
   td.no { background:#f08080; }
   td.maybe { background:#ffd580; }
   td.yes { background:#8fbc8f; }
 
-  /* small UI */
   .controls { display:flex; gap:8px; align-items:center; margin:10px 0; }
   .player-input input { padding:6px; }
   .player-input button { padding:6px 8px; }
@@ -34,21 +31,21 @@
   #players-ul button { width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer; text-align:left; }
   #players-ul button:hover { background:#f0f0f0; }
 
-  /* sidebar */
   #sidebar { position:fixed; right:0; top:0; width:var(--sidebar-w); height:100vh; background:#101217; color:#fff; padding:12px; box-shadow:-4px 0 12px rgba(0,0,0,.15); overflow:auto; }
   #sidebar h3 { margin:6px 0 10px 0; font-size:16px; }
   #sidebar button { display:block; width:100%; padding:8px; margin:6px 0; border:none; border-radius:6px; background:#1a1d23; color:#fff; cursor:pointer; }
   #sidebar button:hover { background:#23272f; }
   .hidden-test { opacity:.35; }
 
-  /* login box */
   #login-box { margin:8px 0; padding:8px; border-radius:8px; background:#fff; border:1px solid #ddd; }
   #login-box input { display:block; width:100%; padding:8px; margin:6px 0; border:1px solid #ccc; border-radius:6px; }
   #login-box button { padding:8px 10px; margin-right:6px; }
   #login-status { font-size:13px; color:#444; margin-top:6px; }
 
-  /* responsive */
-  @media (max-width:900px) { main { padding-right:12px; } #sidebar { display:none; } }
+  @media (max-width:900px) { 
+    main { padding-right:12px; }
+    #sidebar { display:none; }
+  }
 </style>
 </head>
 <body>
@@ -101,14 +98,7 @@
 
     <div style="margin-left:12px">
       <label style="font-weight:600">⏰</label>
-      <select id="timezone">
-        <option value="UTC">UTC</option>
-        <option value="EST">EST</option>
-        <option value="PST">PST</option>
-        <option value="CET">CET</option>
-        <option value="GMT">GMT</option>
-        <option value="JST">JST</option>
-      </select>
+      <select id="timezone"></select>
     </div>
 
     <div style="margin-left:auto">
@@ -133,7 +123,7 @@
 </main>
 
 <script type="module">
-// ========================= FIREBASE & AUTH =========================
+/* ========================= FIREBASE ========================= */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
@@ -152,7 +142,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// ========================= TEAM =========================
+/* ========================= TEAM ========================= */
 const allowedTeams = ["Canada","USA_Red","USA_White","SUD","Europe","Africa","Asia","Geru","UK","team1"];
 const urlParams = new URLSearchParams(window.location.search);
 const teamId = urlParams.get("team") || "team1";
@@ -162,7 +152,7 @@ if (!allowedTeams.includes(teamId)) {
 }
 document.getElementById("team-name").innerText = `Availability: ${teamId}`;
 
-// ========================= DOM =========================
+/* ========================= DOM ========================= */
 const gridBody = document.querySelector("#availability-grid tbody");
 const playerInput = document.getElementById("player-name");
 const loadBtn = document.getElementById("loadButton");
@@ -178,7 +168,55 @@ const loginBtn = document.getElementById("login-btn");
 const logoutBtn = document.getElementById("logout-btn");
 const loginStatus = document.getElementById("login-status");
 
-// ========================= GRID =========================
+/* ========================= TIMEZONES ========================= */
+const SUPPORTED_ZONES = [
+  "UTC",
+  "GMT",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "Europe/London",
+  "Europe/Berlin",
+  "Europe/Paris",
+  "Africa/Johannesburg",
+  "America/Sao_Paulo",
+  "Asia/Tokyo",
+  "Asia/Shanghai",
+  "Asia/Kolkata",
+  "Australia/Sydney"
+];
+
+function getLabelForZone(zone) {
+  const now = new Date();
+  try {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: zone,
+      hour12: false,
+      timeZoneName: "shortOffset"
+    });
+    const parts = fmt.formatToParts(now);
+    const offset = parts.find(p => p.type === "timeZoneName").value;
+    let short = zone.split("/").pop().replace("_"," ");
+    return `${short} (${offset})`;
+  } catch {
+    return zone;
+  }
+}
+
+function populateTimezoneDropdown() {
+  timezoneSelect.innerHTML = "";
+  SUPPORTED_ZONES.forEach(zone => {
+    const opt = document.createElement("option");
+    opt.value = zone;
+    opt.textContent = getLabelForZone(zone);
+    timezoneSelect.appendChild(opt);
+  });
+}
+
+populateTimezoneDropdown();
+
+/* ========================= GRID ========================= */
 const hours = 24;
 const days = 7;
 let gridData = [];
@@ -210,12 +248,12 @@ function populateGrid(data){
   }
 }
 
-// ========================= FIRESTORE CONVERSION =========================
+/* ========================= FIRESTORE HELPERS ========================= */
 function gridToFS(grid){ const out={}; for(let h=0;h<hours;h++){ out[h]={}; for(let d=0;d<days;d++) out[h][d]=grid[h][d]; } return out; }
 function fsToGrid(obj){ const g=createEmptyGrid(); for(let h=0;h<hours;h++) for(let d=0;d<days;d++) g[h][d]=obj?.[h]?.[d]??0; return g; }
 const teamRef = ()=>doc(db,"teams",teamId);
 
-// ========================= LOAD / SAVE PLAYER =========================
+/* ========================= LOAD / SAVE PLAYER ========================= */
 async function loadPlayer(name){
   if(!name) return alert("enter name");
   const snap = await getDoc(teamRef());
@@ -237,7 +275,7 @@ async function savePlayer(name){
   loadPlayerList();
 }
 
-// ========================= PLAYER LIST =========================
+/* ========================= PLAYER LIST ========================= */
 async function loadPlayerList(){
   const snap = await getDoc(teamRef());
   if(!snap.exists()) return;
@@ -252,19 +290,23 @@ async function loadPlayerList(){
   });
 }
 
-// ========================= AUTH =========================
+/* ========================= AUTH ========================= */
 registerBtn.onclick = async ()=>{
   const u = loginUser.value.trim(); const p = loginPass.value;
   if(!u||!p) return alert("Enter username & password");
-  try{ await createUserWithEmailAndPassword(auth,`${u}@bumpyball.local`,p); loginStatus.textContent="Registered & signed in"; } 
-  catch(e){ alert(e.message); }
+  try{
+    await createUserWithEmailAndPassword(auth,`${u}@bumpyball.local`,p);
+    loginStatus.textContent="Registered & signed in";
+  } catch(e){ alert(e.message); }
 };
 
 loginBtn.onclick = async ()=>{
   const u = loginUser.value.trim(); const p = loginPass.value;
   if(!u||!p) return alert("Enter username & password");
-  try{ await signInWithEmailAndPassword(auth,`${u}@bumpyball.local`,p); loginStatus.textContent="Signed in"; } 
-  catch(e){ alert(e.message); }
+  try{
+    await signInWithEmailAndPassword(auth,`${u}@bumpyball.local`,p);
+    loginStatus.textContent="Signed in";
+  } catch(e){ alert(e.message); }
 };
 
 logoutBtn.onclick=()=>signOut(auth);
@@ -273,23 +315,35 @@ onAuthStateChanged(auth,user=>{
   if(user){
     const short=user.email.replace(/@.*$/,"");
     loginStatus.textContent=`Signed in as ${short}`;
-    logoutBtn.style.display="inline-block"; loginBtn.style.display="none"; registerBtn.style.display="none";
-    loginUser.value=short; playerInput.value=short; playerInput.disabled=true;
+    logoutBtn.style.display="inline-block"; 
+    loginBtn.style.display="none"; 
+    registerBtn.style.display="none";
+    loginUser.value=short; 
+    playerInput.value=short; 
+    playerInput.disabled=true;
   } else {
-    loginStatus.textContent="Not signed in"; logoutBtn.style.display="none"; loginBtn.style.display="inline-block"; registerBtn.style.display="inline-block"; playerInput.disabled=false;
+    loginStatus.textContent="Not signed in"; 
+    logoutBtn.style.display="none"; 
+    loginBtn.style.display="inline-block"; 
+    registerBtn.style.display="inline-block"; 
+    playerInput.disabled=false;
   }
 });
 
-// ========================= BUTTON HOOKS =========================
+/* ========================= BUTTON HOOKS ========================= */
 loadBtn.onclick=()=>loadPlayer(playerInput.value.trim());
 saveBtn.onclick=()=>savePlayer(playerInput.value.trim());
 
-// ========================= NAV =========================
-window.goTeam = id=>{ if(!allowedTeams.includes(id)) return alert("Team does not exist"); window.location.href=`team.html?team=${id}`; }
+/* ========================= NAV ========================= */
+window.goTeam = id=>{ 
+  if(!allowedTeams.includes(id)) return alert("Team does not exist"); 
+  window.location.href=`team.html?team=${id}`; 
+}
 
-// ========================= INIT =========================
+/* ========================= INIT ========================= */
 populateGrid(createEmptyGrid());
 loadPlayerList();
 </script>
 </body>
 </html>
+
