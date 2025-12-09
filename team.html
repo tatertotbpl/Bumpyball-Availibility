@@ -259,12 +259,6 @@ async function savePlayer(name){
 
   const uid = auth.currentUser.uid;
 
-  // Check for duplicate names in the subcollection
-  const teamSnap = await getDoc(doc(db, "teams", teamId));
-  const players = teamSnap.data()?.players || {};
-  const duplicate = Object.entries(players).find(([otherUid,p])=>otherUid!==uid && p.displayName===name);
-  if(duplicate) return alert(`The name "${name}" is already taken by another player.`);
-
   // Save only to this player's doc
   await setDoc(playerRef(uid), {
     grid: gridToFS(gridData),
