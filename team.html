@@ -93,7 +93,8 @@
   <div class="controls">
     <div class="player-input">
       <label style="font-weight:600; margin-right:6px;">👤</label>
-      <input id="player-name" placeholder="Your name" />
+      <!-- EDITED: Make input read-only -->
+      <input id="player-name" placeholder="Your name" readonly />
       <button id="loadButton">📥</button>
     </div>
 
@@ -125,7 +126,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 
 /* ========================= FIREBASE CONFIG ========================= */
@@ -237,12 +238,15 @@ const playerRef = (uid) => doc(db, "teams", teamId, "players", uid);
 function gridToFS(grid){ return grid.reduce((acc,h,i)=>{ acc[i]={}; h.forEach((v,d)=>acc[i][d]=v); return acc; },{}); }
 function fsToGrid(obj){ const g=createEmptyGrid(); for(let h=0;h<hours;h++) for(let d=0;d<days;d++) g[h][d]=obj?.[h]?.[d]??0; return g; }
 
-/* ========================= LOAD / SAVE PLAYER ========================= */
-async function loadPlayer(uid){
-  if(!uid) return alert("Enter name");
+/* ========================= LOAD / SAVE PLAYER (SECURED) ========================= */
+async function loadPlayer(){
+  const user = auth.currentUser;
+  if(!user) return alert("Log in first");
 
+  const uid = user.uid;
   const snap = await getDoc(playerRef(uid));
-  if(snap.exists()) {
+
+  if(snap.exists()){
     const data = snap.data();
     populateGrid(fsToGrid(data.grid));
     if(data.timezone) timezoneSelect.value = data.timezone;
@@ -250,20 +254,20 @@ async function loadPlayer(uid){
     populateGrid(createEmptyGrid());
   }
 
-  loadPlayerList(); // still lists all players
+  loadPlayerList();
 }
 
-async function savePlayer(name){
-  if(!name) return alert("Enter name");
-  if(!auth.currentUser) return alert("Log in first");
+async function savePlayer(){
+  const user = auth.currentUser;
+  if(!user) return alert("Log in first");
 
-  const uid = auth.currentUser.uid;
+  const uid = user.uid;
+  const displayName = user.email.replace(/@.*$/,"");
 
-  // Save only to this player's doc
-  await setDoc(playerRef(uid), {
+  await setDoc(playerRef(uid),{
     grid: gridToFS(gridData),
     timezone: timezoneSelect.value,
-    displayName: name
+    displayName
   });
 
   alert("Saved!");
@@ -271,19 +275,16 @@ async function savePlayer(name){
 }
 
 /* ========================= PLAYER LIST ========================= */
-import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
-
 async function loadPlayerList(){
   const playersCol = collection(db, "teams", teamId, "players");
   const snap = await getDocs(playersCol);
   playersUL.innerHTML = "";
-  snap.forEach(docSnap => {
+  snap.forEach(docSnap=>{
     const data = docSnap.data();
     const li = document.createElement("li");
     const btn = document.createElement("button");
     btn.textContent = data.displayName || docSnap.id;
-    btn.onclick = () => {
-      playerInput.value = data.displayName || docSnap.id;
+    btn.onclick = ()=>{
       populateGrid(fsToGrid(data.grid));
       if(data.timezone) timezoneSelect.value = data.timezone;
     };
@@ -317,20 +318,21 @@ onAuthStateChanged(auth,user=>{
     loginBtn.style.display="none";
     registerBtn.style.display="none";
     loginUser.value=short;
-    playerInput.value=short;
-    playerInput.disabled=false;
+    playerInput.value=short;       // display registered name
+    playerInput.disabled=true;     // lock input
   } else {
     loginStatus.textContent="Not signed in";
     logoutBtn.style.display="none";
     loginBtn.style.display="inline-block";
     registerBtn.style.display="inline-block";
-    playerInput.disabled=false;
+    playerInput.disabled=true;
+    playerInput.value="";          // clear input
   }
 });
 
 /* ========================= BUTTON HOOKS ========================= */
-loadBtn.onclick = ()=>loadPlayer(auth.currentUser?.uid);
-saveBtn.onclick = ()=>savePlayer(playerInput.value.trim());
+loadBtn.onclick = ()=>loadPlayer();
+saveBtn.onclick = ()=>savePlayer();
 
 /* ========================= NAVIGATION ========================= */
 window.goTeam = id=>{
