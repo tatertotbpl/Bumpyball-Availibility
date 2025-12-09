@@ -15,11 +15,14 @@
 </style>
 </head>
 <body>
+
 <h1 id="team-name">Team Heatmap</h1>
+
 <table id="heatmap-grid" aria-label="team heatmap">
   <thead>
     <tr>
-      <th>Time (UTC)</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+      <th>Time (UTC)</th>
+      <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
     </tr>
   </thead>
   <tbody></tbody>
@@ -38,91 +41,152 @@ const firebaseConfig = {
   appId: "1:33863251672:web:ffc0d728fe31321c0809ad",
   measurementId: "G-8K3MEHMLRN"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const urlParams = new URLSearchParams(window.location.search);
-const teamId = urlParams.get('team') || "team1";
-document.getElementById('team-name').innerText = `Team Heatmap: ${teamId}`;
+const teamId = urlParams.get("team") || "team1";
+document.getElementById("team-name").innerText = `Team Heatmap: ${teamId}`;
 
-const tbody = document.querySelector('#heatmap-grid tbody');
+const tbody = document.querySelector("#heatmap-grid tbody");
+
 const hours = 24;
 const days = 7;
-const tzOffsets = {'UTC':0,'EST':-5,'PST':-8,'CET':1,'GMT':0,'JST':9};
 
-function createEmptyCombined(){
-  const g=[];
-  for(let h=0;h<hours;h++){ g[h]=[]; for(let d=0;d<days;d++){ g[h][d] = { total:0, list: [] }; } }
+// --------------------------------------------------
+// ✅ EXPANDED TIMEZONES WITH CORRECT UTC OFFSETS
+// --------------------------------------------------
+const tzOffsets = {
+  "UTC": 0,
+  "GMT": 0,
+  "EST (UTC-5)": -5,
+  "EDT (UTC-4)": -4,
+  "CST (UTC-6)": -6,
+  "CDT (UTC-5)": -5,
+  "MST (UTC-7)": -7,
+  "MDT (UTC-6)": -6,
+  "PST (UTC-8)": -8,
+  "PDT (UTC-7)": -7,
+  "CET (UTC+1)": 1,
+  "CEST (UTC+2)": 2,
+  "JST (UTC+9)": 9,
+  "AEST (UTC+10)": 10,
+  "AEDT (UTC+11)": 11
+};
+
+function createEmptyCombined() {
+  const g = [];
+  for (let h = 0; h < hours; h++) {
+    g[h] = [];
+    for (let d = 0; d < days; d++) {
+      g[h][d] = { total: 0, list: [] };
+    }
+  }
   return g;
 }
-function getColor(count,max){
-  if(!max) return '#fff';
+
+function getColor(count, max) {
+  if (!max) return "#fff";
   const ratio = Math.min(count / max, 1);
   const intensity = Math.round(255 - ratio * 200);
   return `rgb(${intensity},255,${intensity})`;
 }
 
-// convert a player's stored grid (object 0/1/2) from their timezone -> UTC positions (keeps original numeric val)
-function convertPlayerGridToUTC(playerGridObj, tz){
+// --------------------------------------------------
+// Converts a player's grid to UTC using new tz system
+// --------------------------------------------------
+function convertPlayerGridToUTC(playerGridObj, tzName) {
+  const offset = tzOffsets[tzName] ?? 0;
+
   const out = [];
-  for(let h=0;h<hours;h++){ out[h]=[]; for(let d=0;d<days;d++) out[h][d] = 0; }
-  const offset = tzOffsets[tz] ?? 0;
-  for(let h=0; h<hours; h++){
-    for(let d=0; d<days; d++){
+  for (let h = 0; h < hours; h++) {
+    out[h] = [];
+    for (let d = 0; d < days; d++) out[h][d] = 0;
+  }
+
+  for (let h = 0; h < hours; h++) {
+    for (let d = 0; d < days; d++) {
       const val = playerGridObj?.[h]?.[d] ?? 0;
-      if(!val) continue;
+      if (!val) continue;
+
       const utcHour = (h - offset + 24) % 24;
       let dayShift = (h - offset < 0 ? -1 : (h - offset >= 24 ? 1 : 0));
       const utcDay = (d + dayShift + 7) % 7;
-      // if multiple players produce same cell we'll accumulate in dashboard logic
+
       out[utcHour][utcDay] = val;
     }
   }
+
   return out;
 }
 
-function renderHeatmap(combined){
-  tbody.innerHTML = '';
-  // compute max for color scaling
+function renderHeatmap(combined) {
+  tbody.innerHTML = "";
+
   let max = 0;
-  for(let h=0;h<hours;h++) for(let d=0;d<days;d++) if(combined[h][d].total > max) max = combined[h][d].total;
-  for(let h=0;h<hours;h++){
-    const tr = document.createElement('tr');
-    const tcell = document.createElement('td'); tcell.className='time-cell'; tcell.textContent = `${h}:00`; tr.appendChild(tcell);
-    for(let d=0; d<days; d++){
-      const cell = document.createElement('td');
+  for (let h = 0; h < hours; h++)
+    for (let d = 0; d < days; d++)
+      if (combined[h][d].total > max) max = combined[h][d].total;
+
+  for (let h = 0; h < hours; h++) {
+    const tr = document.createElement("tr");
+
+    const tcell = document.createElement("td");
+    tcell.className = "time-cell";
+    tcell.textContent = `${h}:00`;
+    tr.appendChild(tcell);
+
+    for (let d = 0; d < days; d++) {
+      const cell = document.createElement("td");
       const meta = combined[h][d];
+
       cell.style.backgroundColor = getColor(meta.total, max);
-      // show total with one decimal if needed
-      cell.textContent = (Math.round(meta.total*10)/10).toString();
-      // tooltip: show individual statuses
-      const lines = meta.list.length ? meta.list : ['(no submissions)'];
-      cell.title = lines.join('\n');
+      cell.textContent = (Math.round(meta.total * 10) / 10).toString();
+
+      cell.title = meta.list.length ? meta.list.join("\n") : "(no submissions)";
       tr.appendChild(cell);
     }
+
     tbody.appendChild(tr);
   }
 }
 
-async function loadTeamHeatmap(){
-  const snap = await getDoc(doc(db,'teams',teamId));
+async function loadTeamHeatmap() {
+  const snap = await getDoc(doc(db, "teams", teamId));
   const combined = createEmptyCombined();
-  if(!snap.exists()){ renderHeatmap(combined); return; }
+
+  if (!snap.exists()) {
+    renderHeatmap(combined);
+    return;
+  }
+
   const players = snap.data().players || {};
-  for(const name in players){
+
+  for (const name in players) {
     const p = players[name];
-    const gridObj = p.grid || {}; // stored grid object with numeric vals
-    const tz = p.timezone || 'UTC';
+    const gridObj = p.grid || {};
+    const tz = p.timezone || "UTC";
+
     const utcGrid = convertPlayerGridToUTC(gridObj, tz);
-    for(let h=0;h<hours;h++){
-      for(let d=0;d<days;d++){
+
+    for (let h = 0; h < hours; h++) {
+      for (let d = 0; d < days; d++) {
         const val = utcGrid[h][d];
-        if(val===1){ combined[h][d].total += 0.5; combined[h][d].list.push(`${name} — Maybe`); }
-        else if(val===2){ combined[h][d].total += 1; combined[h][d].list.push(`${name} — Yes`); }
-        else { combined[h][d].list.push(`${name} — No`); }
+
+        if (val === 1) {
+          combined[h][d].total += 0.5;
+          combined[h][d].list.push(`${name} — Maybe`);
+        } else if (val === 2) {
+          combined[h][d].total += 1;
+          combined[h][d].list.push(`${name} — Yes`);
+        } else {
+          combined[h][d].list.push(`${name} — No`);
+        }
       }
     }
   }
+
   renderHeatmap(combined);
 }
 
