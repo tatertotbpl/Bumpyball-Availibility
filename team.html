@@ -267,12 +267,21 @@ async function savePlayer(name){
   if(!auth.currentUser) return alert("log in first");
 
   const uid = auth.currentUser.uid;
+  const snap = await getDoc(teamRef());
+  const players = snap.data()?.players || {};
+
+  // Check if another UID already has this display name
+  const duplicate = Object.entries(players).find(([otherUid, p]) => otherUid !== uid && p.displayName === name);
+  if(duplicate) {
+    return alert(`The name "${name}" is already taken by another player. Pick a different one.`);
+  }
+
   await setDoc(teamRef(), {
     players: {
       [uid]: {
         grid: gridToFS(gridData),
         timezone: timezoneSelect.value,
-        displayName: playerInput.value
+        displayName: name
       }
     }
   }, { merge:true });
