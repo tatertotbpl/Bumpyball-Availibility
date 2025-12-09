@@ -123,11 +123,11 @@
 </main>
 
 <script type="module">
-/* ========================= FIREBASE ========================= */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 
+/* ========================= FIREBASE CONFIG ========================= */
 const firebaseConfig = {
   apiKey: "AIzaSyAlpvgPbox4IvXQ74uvT7wx_Zv2ARwXaYY",
   authDomain: "smashkarts-availability.firebaseapp.com",
@@ -137,7 +137,6 @@ const firebaseConfig = {
   appId: "1:33863251672:web:ffc0d728fe31321c0809ad",
   measurementId: "G-8K3MEHMLRN"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -152,7 +151,7 @@ if (!allowedTeams.includes(teamId)) {
 }
 document.getElementById("team-name").innerText = `Availability: ${teamId}`;
 
-/* ========================= DOM ========================= */
+/* ========================= DOM ELEMENTS ========================= */
 const gridBody = document.querySelector("#availability-grid tbody");
 const playerInput = document.getElementById("player-name");
 const loadBtn = document.getElementById("loadButton");
@@ -170,53 +169,50 @@ const loginStatus = document.getElementById("login-status");
 
 /* ========================= TIMEZONES ========================= */
 const SUPPORTED_ZONES = [
-  "UTC",
-  "GMT",
-  "America/New_York",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "Europe/London",
-  "Europe/Berlin",
-  "Europe/Paris",
-  "Africa/Johannesburg",
-  "America/Sao_Paulo",
-  "Asia/Tokyo",
-  "Asia/Shanghai",
-  "Asia/Kolkata",
-  "Australia/Sydney"
+  {zone:"America/New_York", label:"EST (New York)"},
+  {zone:"America/Chicago", label:"CST (Chicago)"},
+  {zone:"America/Denver", label:"MST (Denver)"},
+  {zone:"America/Los_Angeles", label:"PST (Los Angeles)"},
+  {zone:"Europe/London", label:"GMT (London)"},
+  {zone:"Europe/Berlin", label:"CET (Berlin)"},
+  {zone:"Europe/Paris", label:"CET (Paris)"},
+  {zone:"Africa/Johannesburg", label:"SAST (Johannesburg)"},
+  {zone:"America/Sao_Paulo", label:"BRT (São Paulo)"},
+  {zone:"Asia/Tokyo", label:"JST (Tokyo)"},
+  {zone:"Asia/Shanghai", label:"CST (Shanghai)"},
+  {zone:"Asia/Kolkata", label:"IST (Kolkata)"},
+  {zone:"Australia/Sydney", label:"AEST (Sydney)"}
 ];
 
-function getLabelForZone(zone) {
+function getLabelForZone(entry){
   const now = new Date();
   try {
     const fmt = new Intl.DateTimeFormat("en-US", {
-      timeZone: zone,
+      timeZone: entry.zone,
       hour12: false,
       timeZoneName: "shortOffset"
     });
     const parts = fmt.formatToParts(now);
-    const offset = parts.find(p => p.type === "timeZoneName").value;
-    let short = zone.split("/").pop().replace("_"," ");
-    return `${short} (${offset})`;
+    const offset = parts.find(p => p.type === "timeZoneName")?.value ?? "";
+    return `${entry.label} (${offset})`;
   } catch {
-    return zone;
+    return entry.label;
   }
 }
 
 function populateTimezoneDropdown() {
   timezoneSelect.innerHTML = "";
-  SUPPORTED_ZONES.forEach(zone => {
+  SUPPORTED_ZONES.forEach(entry => {
     const opt = document.createElement("option");
-    opt.value = zone;
-    opt.textContent = getLabelForZone(zone);
+    opt.value = entry.zone;
+    opt.textContent = getLabelForZone(entry);
     timezoneSelect.appendChild(opt);
   });
 }
 
 populateTimezoneDropdown();
 
-/* ========================= GRID ========================= */
+/* ========================= GRID LOGIC ========================= */
 const hours = 24;
 const days = 7;
 let gridData = [];
@@ -334,7 +330,7 @@ onAuthStateChanged(auth,user=>{
 loadBtn.onclick=()=>loadPlayer(playerInput.value.trim());
 saveBtn.onclick=()=>savePlayer(playerInput.value.trim());
 
-/* ========================= NAV ========================= */
+/* ========================= NAVIGATION ========================= */
 window.goTeam = id=>{ 
   if(!allowedTeams.includes(id)) return alert("Team does not exist"); 
   window.location.href=`team.html?team=${id}`; 
@@ -346,4 +342,3 @@ loadPlayerList();
 </script>
 </body>
 </html>
-
