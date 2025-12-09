@@ -50,7 +50,6 @@ const teamId = urlParams.get("team") || "team1";
 document.getElementById("team-name").innerText = `Team Heatmap: ${teamId}`;
 
 const tbody = document.querySelector("#heatmap-grid tbody");
-
 const hours = 24;
 const days = 7;
 
@@ -83,7 +82,7 @@ function getColor(count, max) {
   return `rgb(${intensity},255,${intensity})`;
 }
 
-// ---------------- TIMEZONE CONVERSION ----------------
+// ---------------- CONVERT GRID TO UTC ----------------
 function convertPlayerGridToUTC(playerGrid, tzName) {
   const offset = tzOffsets[tzName] ?? 0;
   const out = Array.from({length: hours}, () => Array.from({length: days}, () => 0));
