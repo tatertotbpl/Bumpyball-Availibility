@@ -211,7 +211,6 @@ function populateTimezoneDropdown() {
     timezoneSelect.appendChild(opt);
   });
 }
-
 populateTimezoneDropdown();
 
 /* ========================= GRID LOGIC ========================= */
@@ -251,13 +250,13 @@ function gridToFS(grid){ const out={}; for(let h=0;h<hours;h++){ out[h]={}; for(
 function fsToGrid(obj){ const g=createEmptyGrid(); for(let h=0;h<hours;h++) for(let d=0;d<days;d++) g[h][d]=obj?.[h]?.[d]??0; return g; }
 const teamRef = ()=>doc(db,"teams",teamId);
 
-/* ========================= LOAD / SAVE PLAYER ========================= */
-async function loadPlayer(name){
-  if(!name) return alert("enter name");
+/* ========================= LOAD / SAVE PLAYER (UID BASED) ========================= */
+async function loadPlayer(uid){
+  if(!uid) return alert("enter name");
   const snap = await getDoc(teamRef());
   if(!snap.exists()) await setDoc(teamRef(),{players:{}});
   const players = snap.data()?.players||{};
-  const stored = players[name];
+  const stored = players[uid];
   if(stored){ populateGrid(fsToGrid(stored.grid)); if(stored.timezone) timezoneSelect.value=stored.timezone; } 
   else populateGrid(createEmptyGrid());
   loadPlayerList();
@@ -266,9 +265,18 @@ async function loadPlayer(name){
 async function savePlayer(name){
   if(!name) return alert("enter name");
   if(!auth.currentUser) return alert("log in first");
-  const expected = auth.currentUser.email.replace(/@.*$/,"");
-  if(name!==expected) return alert(`Player name must match your login: "${expected}"`);
-  await setDoc(teamRef(),{players:{[name]:{grid:gridToFS(gridData),timezone:timezoneSelect.value}}},{merge:true});
+
+  const uid = auth.currentUser.uid;
+  await setDoc(teamRef(), {
+    players: {
+      [uid]: {
+        grid: gridToFS(gridData),
+        timezone: timezoneSelect.value,
+        displayName: playerInput.value
+      }
+    }
+  }, { merge:true });
+
   alert("Saved!");
   loadPlayerList();
 }
@@ -279,11 +287,16 @@ async function loadPlayerList(){
   if(!snap.exists()) return;
   const players = snap.data()?.players||{};
   playersUL.innerHTML = "";
-  Object.keys(players).forEach(name=>{
+  Object.keys(players).forEach(uid=>{
+    const name = players[uid].displayName || uid;
     const li=document.createElement("li");
     const btn=document.createElement("button");
     btn.textContent=name;
-    btn.onclick=()=>{ playerInput.value=name; populateGrid(fsToGrid(players[name].grid)); if(players[name].timezone) timezoneSelect.value=players[name].timezone; };
+    btn.onclick=()=>{ 
+      playerInput.value = name; 
+      populateGrid(fsToGrid(players[uid].grid)); 
+      if(players[uid].timezone) timezoneSelect.value = players[uid].timezone; 
+    };
     li.appendChild(btn); playersUL.appendChild(li);
   });
 }
@@ -318,7 +331,7 @@ onAuthStateChanged(auth,user=>{
     registerBtn.style.display="none";
     loginUser.value=short; 
     playerInput.value=short; 
-    playerInput.disabled=true;
+    playerInput.disabled=false;  // now user can type a different display name
   } else {
     loginStatus.textContent="Not signed in"; 
     logoutBtn.style.display="none"; 
@@ -329,7 +342,7 @@ onAuthStateChanged(auth,user=>{
 });
 
 /* ========================= BUTTON HOOKS ========================= */
-loadBtn.onclick=()=>loadPlayer(playerInput.value.trim());
+loadBtn.onclick=()=>loadPlayer(auth.currentUser?.uid);
 saveBtn.onclick=()=>savePlayer(playerInput.value.trim());
 
 /* ========================= NAVIGATION ========================= */
@@ -344,3 +357,4 @@ loadPlayerList();
 </script>
 </body>
 </html>
+
