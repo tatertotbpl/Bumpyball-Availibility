@@ -56,11 +56,12 @@
   <button onclick="goTeam('USA_Red')">🇺🇸 USA Red</button>
   <button onclick="goTeam('USA_White')">🇺🇸 USA White</button>
   <button onclick="goTeam('SUD')">🏳️ SUD</button>
-  <button onclick="goTeam('Europe')">🌍 Europe</button>
+  <button onclick="goTeam('Europe')">🇪🇺 Europe</button>
   <button onclick="goTeam('Africa')">🌍 Africa</button>
-  <button onclick="goTeam('Asia')">🌏 Asia</button>
-  <button onclick="goTeam('Geru')">🌐 Geru</button>
+  <button onclick="goTeam('Asia')">🍱 Asia</button>
+  <button onclick="goTeam('Geru')">🇩🇪🇷🇺 Geru</button>
   <button onclick="goTeam('UK')">🇬🇧 UK</button>
+  <button onclick="goTeam('BraCombia')">🇧🇷 BraCombia</button>
   <button class="hidden-test" onclick="goTeam('team1')">🔧 team1 (test)</button>
 </div>
 
@@ -142,7 +143,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 /* ========================= TEAM ========================= */
-const allowedTeams = ["Canada","USA_Red","USA_White","SUD","Europe","Africa","Asia","Geru","UK","team1"];
+const allowedTeams = ["Canada","USA_Red","USA_White","SUD","Europe","Africa","Asia","Geru","UK","BraCombia","team1"];
 const urlParams = new URLSearchParams(window.location.search);
 const teamId = urlParams.get("team") || "team1";
 if (!allowedTeams.includes(teamId)) {
