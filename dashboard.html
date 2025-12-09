@@ -29,7 +29,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
 // ---------------- FIREBASE CONFIG ----------------
 const firebaseConfig = {
@@ -145,28 +145,27 @@ function renderHeatmap(combined) {
 
 // ---------------- LOAD TEAM DATA ----------------
 async function loadTeamHeatmap() {
-  const snap = await getDoc(doc(db, "teams", teamId));
+  const playersCol = collection(db, "teams", teamId, "players");
+  const snap = await getDocs(playersCol);
   const combined = createEmptyCombined();
 
-  if (!snap.exists()) { renderHeatmap(combined); return; }
-
-  const players = snap.data().players || {};
-  for (const name in players) {
-    const p = players[name];
+  snap.forEach(docSnap => {
+    const p = docSnap.data();
     const gridObj = p.grid || {};
-    const tz = p.timezone || "UTC"; // tz = zone ID
+    const tz = p.timezone || "UTC";
+    const displayName = p.displayName || docSnap.id;
 
     const utcGrid = convertPlayerGridToUTC(gridObj, tz);
 
     for (let h = 0; h < hours; h++) {
       for (let d = 0; d < days; d++) {
         const val = utcGrid[h][d];
-        if (val === 1) { combined[h][d].total += 0.5; combined[h][d].list.push(`${name} — Maybe`); }
-        else if (val === 2) { combined[h][d].total += 1; combined[h][d].list.push(`${name} — Yes`); }
-        else { combined[h][d].list.push(`${name} — No`); }
+        if (val === 1) { combined[h][d].total += 0.5; combined[h][d].list.push(`${displayName} — Maybe`); }
+        else if (val === 2) { combined[h][d].total += 1; combined[h][d].list.push(`${displayName} — Yes`); }
+        else { combined[h][d].list.push(`${displayName} — No`); }
       }
     }
-  }
+  });
 
   renderHeatmap(combined);
 }
