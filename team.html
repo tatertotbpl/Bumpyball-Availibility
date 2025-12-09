@@ -233,20 +233,24 @@ function populateGrid(data){
 }
 
 /* ========================= FIRESTORE HELPERS ========================= */
-const teamRef = () => doc(db,"teams",teamId);
+const playerRef = (uid) => doc(db, "teams", teamId, "players", uid);
 function gridToFS(grid){ return grid.reduce((acc,h,i)=>{ acc[i]={}; h.forEach((v,d)=>acc[i][d]=v); return acc; },{}); }
 function fsToGrid(obj){ const g=createEmptyGrid(); for(let h=0;h<hours;h++) for(let d=0;d<days;d++) g[h][d]=obj?.[h]?.[d]??0; return g; }
 
 /* ========================= LOAD / SAVE PLAYER ========================= */
 async function loadPlayer(uid){
   if(!uid) return alert("Enter name");
-  const snap = await getDoc(teamRef());
-  if(!snap.exists()) await setDoc(teamRef(),{players:{}});
-  const players = snap.data()?.players||{};
-  const stored = players[uid];
-  if(stored){ populateGrid(fsToGrid(stored.grid)); if(stored.timezone) timezoneSelect.value=stored.timezone; }
-  else populateGrid(createEmptyGrid());
-  loadPlayerList();
+
+  const snap = await getDoc(playerRef(uid));
+  if(snap.exists()) {
+    const data = snap.data();
+    populateGrid(fsToGrid(data.grid));
+    if(data.timezone) timezoneSelect.value = data.timezone;
+  } else {
+    populateGrid(createEmptyGrid());
+  }
+
+  loadPlayerList(); // still lists all players
 }
 
 async function savePlayer(name){
@@ -254,33 +258,43 @@ async function savePlayer(name){
   if(!auth.currentUser) return alert("Log in first");
 
   const uid = auth.currentUser.uid;
-  const snap = await getDoc(teamRef());
-  const players = snap.data()?.players || {};
 
+  // Check for duplicate names in the subcollection
+  const teamSnap = await getDoc(doc(db, "teams", teamId));
+  const players = teamSnap.data()?.players || {};
   const duplicate = Object.entries(players).find(([otherUid,p])=>otherUid!==uid && p.displayName===name);
   if(duplicate) return alert(`The name "${name}" is already taken by another player.`);
 
-  await setDoc(teamRef(), {
-    players: {[uid]: {grid:gridToFS(gridData), timezone:timezoneSelect.value, displayName:name}}
-  }, {merge:true});
+  // Save only to this player's doc
+  await setDoc(playerRef(uid), {
+    grid: gridToFS(gridData),
+    timezone: timezoneSelect.value,
+    displayName: name
+  });
 
   alert("Saved!");
   loadPlayerList();
 }
 
 /* ========================= PLAYER LIST ========================= */
+import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
 async function loadPlayerList(){
-  const snap = await getDoc(teamRef());
-  if(!snap.exists()) return;
-  const players = snap.data()?.players||{};
-  playersUL.innerHTML="";
-  Object.keys(players).forEach(uid=>{
-    const name = players[uid].displayName || uid;
-    const li=document.createElement("li");
-    const btn=document.createElement("button");
-    btn.textContent=name;
-    btn.onclick=()=>{ playerInput.value=name; populateGrid(fsToGrid(players[uid].grid)); if(players[uid].timezone) timezoneSelect.value=players[uid].timezone; };
-    li.appendChild(btn); playersUL.appendChild(li);
+  const playersCol = collection(db, "teams", teamId, "players");
+  const snap = await getDocs(playersCol);
+  playersUL.innerHTML = "";
+  snap.forEach(docSnap => {
+    const data = docSnap.data();
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.textContent = data.displayName || docSnap.id;
+    btn.onclick = () => {
+      playerInput.value = data.displayName || docSnap.id;
+      populateGrid(fsToGrid(data.grid));
+      if(data.timezone) timezoneSelect.value = data.timezone;
+    };
+    li.appendChild(btn);
+    playersUL.appendChild(li);
   });
 }
 
